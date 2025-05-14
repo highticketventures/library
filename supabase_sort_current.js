@@ -613,5 +613,3 @@
   window.setupCustomSort = setupCustomSort;
   window.refreshListing = refreshListing;
 })();
-
-console.log("SUPABASE CLIENT LOADED, AUTH_URL:", AUTH_URL);
