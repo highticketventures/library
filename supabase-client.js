@@ -2,7 +2,7 @@
 (function() {
   // URL к вашей Netlify функции, которая будет предоставлять ключ (добавим позже)
   const AUTH_URL =
-    "https://ваш-netlify-app.netlify.app/.netlify/functions/get-supabase-key";
+    "https://supabase-webflow-integration.netlify.app/.netlify/functions/get-supabase-key";
 
   // Инициализация клиента после получения ключа
   async function initSupabaseClient() {
