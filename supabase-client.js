@@ -1,11 +1,12 @@
 (function() {
-  const AUTH_URL = "https://htvlibrary.netlify.app";
+  const AUTH_URL =
+    "https://htvlibrary.netlify.app/.netlify/functions/get-supabase-key";
 
   async function initSupabaseClient() {
     try {
       const response = await fetch(AUTH_URL);
       if (!response.ok) {
-        throw new Error("Не удалось получить ключ авторизации");
+        throw new Error("Failed to obtain authorization key");
       }
 
       const { supabaseUrl, supabaseKey } = await response.json();
@@ -18,7 +19,7 @@
 
       return supabase;
     } catch (error) {
-      console.error("Ошибка инициализации Supabase:", error);
+      console.error("Error initializing Supabase:", error);
       throw error;
     }
   }
@@ -30,7 +31,6 @@
   window.SupabaseAPI = {
     init: initSupabaseClient,
 
-    // Метод ожидания готовности клиента
     onReady: function(callback) {
       if (window.supabaseInstance) {
         callback(window.supabaseInstance);
@@ -41,7 +41,6 @@
       }
     },
 
-    // Пример метода для получения данных
     getItems: async function(table, options = {}) {
       return await this.onReady(async (supabase) => {
         let query = supabase.from(table).select(options.select || "*");
@@ -55,14 +54,11 @@
         return await query;
       });
     },
-
-    // Добавьте другие методы по необходимости
   };
 
-  // Автоматическая инициализация при загрузке страницы
   document.addEventListener("DOMContentLoaded", () => {
     window.SupabaseAPI.init().catch((err) => {
-      console.error("Не удалось инициализировать Supabase:", err);
+      console.error("Failed to initialize Supabase:", err);
     });
   });
 })();
