@@ -55,7 +55,7 @@
       });
     },
   };
-
+  // test change
   document.addEventListener("DOMContentLoaded", () => {
     window.SupabaseAPI.init().catch((err) => {
       console.error("Failed to initialize Supabase:", err);
