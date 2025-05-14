@@ -414,6 +414,7 @@
       return uid;
     }
     async trackView(cardId) {
+      console.log("trackView cardId:", cardId);
       const key = "viewedCards";
       let seen = {};
       try {
@@ -437,9 +438,15 @@
         .eq("card_id", cardId)
         .single();
       const newCnt = !error && data ? data.views + 1 : 1;
-      await this.supabase
+      const upsertRes = await this.supabase
         .from("page_views")
         .upsert({ card_id: cardId, views: newCnt }, { onConflict: "card_id" });
+
+      if (upsertRes.error) {
+        console.error("Ошибка upsert page_views:", upsertRes.error);
+      } else {
+        console.log("Upsert page_views OK:", upsertRes);
+      }
       return newCnt;
     }
     async loadLikes(cardId) {
