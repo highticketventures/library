@@ -62,3 +62,4 @@
     });
   });
 })();
+console.log("SUPABASE CLIENT LOADED, AUTH_URL:", AUTH_URL);
