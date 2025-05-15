@@ -605,3 +605,15 @@
   window.setupCustomSort = setupCustomSort;
   window.refreshListing = refreshListing;
 })();
+// test change
+document.addEventListener("DOMContentLoaded", () => {
+  const debouncedListRefresh = debounce(refreshListing, 300);
+  window.SupabaseAPI.onReady(async () => {
+    const isDetail = await refreshDetail();
+    if (!isDetail) refreshListing();
+    setupCustomSort();
+    setupPeriodicUpdates(debouncedListRefresh);
+    setupEventListeners(debouncedListRefresh);
+    setupMutationObservers(debouncedListRefresh);
+  });
+});
