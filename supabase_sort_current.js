@@ -25,14 +25,6 @@
     if (window.supabaseInstance) {
       return new SupabaseAdapter(window.supabaseInstance);
     }
-    if (window.supabase?.createClient) {
-      return new SupabaseAdapter(
-        window.supabase.createClient(
-          "https://kimtrowcifqriuxubpfj.supabase.co",
-          ""
-        )
-      );
-    }
     return new LocalAdapter();
   }
 
