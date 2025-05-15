@@ -55,17 +55,6 @@
       });
     },
   };
-  // test change
-  document.addEventListener("DOMContentLoaded", () => {
-    const debouncedListRefresh = debounce(refreshListing, 300);
-    window.SupabaseAPI.onReady(async () => {
-      const isDetail = await refreshDetail();
-      if (!isDetail) refreshListing();
-      setupCustomSort();
-      setupPeriodicUpdates(debouncedListRefresh);
-      setupEventListeners(debouncedListRefresh);
-      setupMutationObservers(debouncedListRefresh);
-    });
-  });
+
+  console.log("SUPABASE CLIENT LOADED, AUTH_URL:", AUTH_URL);
 })();
-console.log("SUPABASE CLIENT LOADED, AUTH_URL:", AUTH_URL);
