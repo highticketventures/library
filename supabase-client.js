@@ -1,6 +1,6 @@
 (function() {
   const AUTH_URL =
-    "https://htvlibrary.netlify.app/.netlify/functions/get-supabase-key";
+    "https://htv-library.netlify.app/.netlify/functions/get-supabase-key";
 
   async function initSupabaseClient() {
     try {
