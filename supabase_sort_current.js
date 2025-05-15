@@ -3,6 +3,8 @@
   const DEBUG = false;
   let currentSortMode = "recent-desc";
 
+  window._debug_adapter = () => adapter;
+
   function debug(...args) {
     if (DEBUG) console.log("[card-stats]", ...args);
   }
