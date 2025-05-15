@@ -406,27 +406,38 @@
       return uid;
     }
     async trackView(cardId) {
-      console.log("[SupabaseAdapter] trackView: try increment for", cardId);
+      console.log("trackView cardId:", cardId);
+      const key = "viewedCards";
+      let seen = {};
+      try {
+        seen = JSON.parse(localStorage.getItem(key) || "{}");
+      } catch {
+        localStorage.setItem(key, "{}");
+      }
+      if (seen[cardId]) {
+        const { data } = await this.supabase
+          .from("page_views")
+          .select("views")
+          .eq("card_id", cardId)
+          .single();
+        return data?.views || 0;
+      }
+      seen[cardId] = true;
+      localStorage.setItem(key, JSON.stringify(seen));
       const { data, error } = await this.supabase
         .from("page_views")
         .select("views")
         .eq("card_id", cardId)
         .single();
-      console.log("[SupabaseAdapter] trackView: select result", data, error);
+      const newCnt = !error && data ? data.views + 1 : 1;
+      const upsertRes = await this.supabase
+        .from("page_views")
+        .upsert({ card_id: cardId, views: newCnt }, { onConflict: "card_id" });
 
-      let newCnt = 1;
-      if (!error && data) {
-        newCnt = (data.views || 0) + 1;
-        const { error: updateError } = await this.supabase
-          .from("page_views")
-          .update({ views: newCnt })
-          .eq("card_id", cardId);
-        console.log("[SupabaseAdapter] trackView: update result", updateError);
+      if (upsertRes.error) {
+        console.error("Ошибка upsert page_views:", upsertRes.error);
       } else {
-        const { error: insertError } = await this.supabase
-          .from("page_views")
-          .insert({ card_id: cardId, views: newCnt });
-        console.log("[SupabaseAdapter] trackView: insert result", insertError);
+        console.log("Upsert page_views OK:", upsertRes);
       }
       return newCnt;
     }
@@ -490,12 +501,10 @@
     }
     async toggleLike(cardId) {
       const userId = this.getUserId();
-      console.log("[SupabaseAdapter] toggleLike: call RPC for", cardId, userId);
       const { data, error } = await this.supabase.rpc("toggle_card_like", {
         p_card_id: cardId,
         p_user_id: userId,
       });
-      console.log("[SupabaseAdapter] toggleLike: rpc result", data, error);
       if (error) throw error;
       this._likesCache[cardId] = {
         count: data.likes_count,
