@@ -119,14 +119,17 @@
       const vEl = item.querySelector(".view-count");
       safeSetText(vEl, viewsMap[id] || 0);
 
-      const wrap = item.querySelector(".idea-content_card-tags-likes-wrapper");
-      if (wrap) {
+      // Новый универсальный обработчик для всех лайковых блоков
+      const likeBlocks = item.querySelectorAll(
+        ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile"
+      );
+      likeBlocks.forEach((wrap) => {
         wrap.classList.toggle("liked", !!userLikedMap[id]);
         const txt = wrap.querySelector(
           ".idea-content_card-tags-likes-text-digit"
         );
         safeSetText(txt, likesMap[id] || 0);
-      }
+      });
     });
 
     initLikeButtons();
