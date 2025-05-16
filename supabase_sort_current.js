@@ -691,7 +691,23 @@ function initDetailLikeView() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", initDetailLikeView);
+// --- Динамическая инициализация лайков на детальной странице через MutationObserver ---
+function observeLikeBlockAndInit() {
+  const targetSelector = ".idea-content_card-tags-likes-wrapper";
+  if (document.querySelector(targetSelector)) {
+    initDetailLikeView();
+    return;
+  }
+  const observer = new MutationObserver(() => {
+    if (document.querySelector(targetSelector)) {
+      initDetailLikeView();
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+document.addEventListener("DOMContentLoaded", observeLikeBlockAndInit);
 
 if (!window.adapter) {
   if (window.supabaseInstance) {
