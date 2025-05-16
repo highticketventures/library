@@ -608,7 +608,12 @@
   window.sortItems = sortItems;
   window.setupCustomSort = setupCustomSort;
   window.refreshListing = refreshListing;
+
+  // Экспортируем классы в window для глобального доступа
+  window.SupabaseAdapter = SupabaseAdapter;
+  window.LocalAdapter = LocalAdapter;
 })();
+
 // test change
 document.addEventListener("DOMContentLoaded", () => {
   const debouncedListRefresh = debounce(refreshListing, 300);
