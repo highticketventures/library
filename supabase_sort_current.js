@@ -662,34 +662,42 @@ function initDetailLikeView() {
     likeWrap.classList.toggle("liked", userLiked);
   });
 
-  if (!likeWrap.dataset.detailLikeInit) {
-    likeWrap.dataset.detailLikeInit = "1";
-    likeWrap.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (likeWrap.classList.contains("loading")) return;
-      likeWrap.classList.add("loading");
-      const was = likeWrap.classList.contains("liked");
-      // Всегда ищем актуальный счетчик внутри likeWrap
-      const likeDigit = likeWrap.querySelector(
-        ".idea-content_card-tags-likes-text-digit"
-      );
-      let old = parseInt(likeDigit.textContent || "0", 10);
-      try {
-        likeWrap.classList.toggle("liked", !was);
-        likeDigit.textContent = was ? old - 1 : old + 1;
-        const { count, userLiked } = await adapter.toggleLike(cardId);
-        console.log("toggleLike result", count, userLiked);
-        likeWrap.classList.toggle("liked", userLiked);
-        likeDigit.textContent = count;
-      } catch (err) {
-        likeWrap.classList.toggle("liked", was);
-        likeDigit.textContent = old;
-      } finally {
-        likeWrap.classList.remove("loading");
-      }
-    });
+  function likeClickHandler(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (likeWrap.classList.contains("loading")) return;
+    likeWrap.classList.add("loading");
+    const was = likeWrap.classList.contains("liked");
+    const likeDigit = likeWrap.querySelector(
+      ".idea-content_card-tags-likes-text-digit"
+    );
+    let old = parseInt(likeDigit.textContent || "0", 10);
+    try {
+      likeWrap.classList.toggle("liked", !was);
+      likeDigit.textContent = was ? old - 1 : old + 1;
+      adapter
+        .toggleLike(cardId)
+        .then(({ count, userLiked }) => {
+          console.log("toggleLike result", count, userLiked);
+          likeWrap.classList.toggle("liked", userLiked);
+          likeDigit.textContent = count;
+        })
+        .catch(() => {
+          likeWrap.classList.toggle("liked", was);
+          likeDigit.textContent = old;
+        })
+        .finally(() => {
+          likeWrap.classList.remove("loading");
+        });
+    } catch (err) {
+      likeWrap.classList.toggle("liked", was);
+      likeDigit.textContent = old;
+      likeWrap.classList.remove("loading");
+    }
   }
+
+  likeWrap.removeEventListener("click", likeClickHandler);
+  likeWrap.addEventListener("click", likeClickHandler);
 }
 
 function observeLikeBlockAndInit() {
