@@ -626,22 +626,22 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// --- Инициализация лайков и просмотров на детальной странице (без изменений остального кода) ---
 function initDetailLikeView() {
   const likeWrap = document.querySelector(
     ".idea-content_card-tags-likes-wrapper"
   );
-  const likeDigit = document.querySelector(
+  if (!likeWrap) return;
+
+  const likeDigit = likeWrap.querySelector(
     ".idea-content_card-tags-likes-text-digit"
   );
   const viewCount = document.querySelector(".view-count");
-  if (!likeWrap || !likeDigit || !viewCount) return;
+  if (!likeDigit || !viewCount) return;
 
   const m = location.pathname.toLowerCase().match(/^\/library\/([^\/]+?)\/?$/);
   if (!m) return;
   const cardId = m[1];
 
-  // Получаем адаптер (используем уже существующий)
   let adapter = window.adapter;
   if (!adapter) {
     if (window.supabaseInstance) {
@@ -652,19 +652,16 @@ function initDetailLikeView() {
     window.adapter = adapter;
   }
 
-  // Получаем и отображаем просмотры
   adapter.trackView(cardId).then((vc) => {
     viewCount.textContent = vc;
   });
 
-  // Получаем и отображаем лайки
   adapter.loadLikes(cardId).then(({ count, userLiked }) => {
     console.log("loadLikes result", count, userLiked);
     likeDigit.textContent = count;
     likeWrap.classList.toggle("liked", userLiked);
   });
 
-  // Навешиваем обработчик лайка (если не навешен)
   if (!likeWrap.dataset.detailLikeInit) {
     likeWrap.dataset.detailLikeInit = "1";
     likeWrap.addEventListener("click", async (e) => {
@@ -673,6 +670,10 @@ function initDetailLikeView() {
       if (likeWrap.classList.contains("loading")) return;
       likeWrap.classList.add("loading");
       const was = likeWrap.classList.contains("liked");
+      // Всегда ищем актуальный счетчик внутри likeWrap
+      const likeDigit = likeWrap.querySelector(
+        ".idea-content_card-tags-likes-text-digit"
+      );
       let old = parseInt(likeDigit.textContent || "0", 10);
       try {
         likeWrap.classList.toggle("liked", !was);
@@ -691,7 +692,6 @@ function initDetailLikeView() {
   }
 }
 
-// --- Динамическая инициализация лайков на детальной странице через MutationObserver ---
 function observeLikeBlockAndInit() {
   const targetSelector = ".idea-content_card-tags-likes-wrapper";
   if (document.querySelector(targetSelector)) {
