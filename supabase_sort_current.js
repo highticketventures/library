@@ -626,17 +626,16 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-function initDetailLikeView() {
-  const likeWrap = document.querySelector(
-    ".idea-content_card-tags-likes-wrapper"
-  );
-  if (!likeWrap) return;
+// Универсальный селектор для лайковых блоков
+const LIKE_BLOCK_SELECTOR =
+  ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
 
-  const likeDigit = likeWrap.querySelector(
-    ".idea-content_card-tags-likes-text-digit"
-  );
+function initDetailLikeView() {
+  const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
+  if (!likeBlocks.length) return;
+
   const viewCount = document.querySelector(".view-count");
-  if (!likeDigit || !viewCount) return;
+  if (!viewCount) return;
 
   const m = location.pathname.toLowerCase().match(/^\/library\/([^\/]+?)\/?$/);
   if (!m) return;
@@ -656,59 +655,56 @@ function initDetailLikeView() {
     viewCount.textContent = vc;
   });
 
-  adapter.loadLikes(cardId).then(({ count, userLiked }) => {
-    console.log("loadLikes result", count, userLiked);
-    likeDigit.textContent = count;
-    likeWrap.classList.toggle("liked", userLiked);
-  });
-
-  function likeClickHandler(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (likeWrap.classList.contains("loading")) return;
-    likeWrap.classList.add("loading");
-    const was = likeWrap.classList.contains("liked");
+  // Для каждого лайкового блока инициализируем отображение и обработчик
+  likeBlocks.forEach((likeWrap) => {
     const likeDigit = likeWrap.querySelector(
       ".idea-content_card-tags-likes-text-digit"
     );
-    let old = parseInt(likeDigit.textContent || "0", 10);
-    try {
-      likeWrap.classList.toggle("liked", !was);
-      likeDigit.textContent = was ? old - 1 : old + 1;
-      adapter
-        .toggleLike(cardId)
-        .then(({ count, userLiked }) => {
-          console.log("toggleLike result", count, userLiked);
-          likeWrap.classList.toggle("liked", userLiked);
-          likeDigit.textContent = count;
-        })
-        .catch(() => {
-          likeWrap.classList.toggle("liked", was);
-          likeDigit.textContent = old;
-        })
-        .finally(() => {
-          likeWrap.classList.remove("loading");
-        });
-    } catch (err) {
-      likeWrap.classList.toggle("liked", was);
-      likeDigit.textContent = old;
-      likeWrap.classList.remove("loading");
-    }
-  }
+    if (!likeDigit) return;
 
-  likeWrap.removeEventListener("click", likeClickHandler);
-  likeWrap.addEventListener("click", likeClickHandler);
+    adapter.loadLikes(cardId).then(({ count, userLiked }) => {
+      likeDigit.textContent = count;
+      likeWrap.classList.toggle("liked", userLiked);
+    });
+
+    function likeClickHandler(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (likeWrap.classList.contains("loading")) return;
+      likeWrap.classList.add("loading");
+      const was = likeWrap.classList.contains("liked");
+      let old = parseInt(likeDigit.textContent || "0", 10);
+      try {
+        likeWrap.classList.toggle("liked", !was);
+        likeDigit.textContent = was ? old - 1 : old + 1;
+        adapter
+          .toggleLike(cardId)
+          .then(({ count, userLiked }) => {
+            likeWrap.classList.toggle("liked", userLiked);
+            likeDigit.textContent = count;
+          })
+          .catch(() => {
+            likeWrap.classList.toggle("liked", was);
+            likeDigit.textContent = old;
+          })
+          .finally(() => {
+            likeWrap.classList.remove("loading");
+          });
+      } catch (err) {
+        likeWrap.classList.toggle("liked", was);
+        likeDigit.textContent = old;
+        likeWrap.classList.remove("loading");
+      }
+    }
+    likeWrap.removeEventListener("click", likeClickHandler);
+    likeWrap.addEventListener("click", likeClickHandler);
+  });
 }
 
 function safeInitDetailLikeView() {
-  const likeWrap = document.querySelector(
-    ".idea-content_card-tags-likes-wrapper"
-  );
-  const likeDigit = likeWrap?.querySelector(
-    ".idea-content_card-tags-likes-text-digit"
-  );
+  const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
   const viewCount = document.querySelector(".view-count");
-  if (!likeWrap || !likeDigit || !viewCount) {
+  if (!likeBlocks.length || !viewCount) {
     setTimeout(safeInitDetailLikeView, 200);
     return;
   }
@@ -716,21 +712,24 @@ function safeInitDetailLikeView() {
 }
 
 function observeWebflowLikeBlock() {
-  const targetSelector = ".idea-content_card-tags-likes-wrapper";
+  const targetSelector = LIKE_BLOCK_SELECTOR;
   const cmsContainer = document.querySelector(
     ".ideainner-hero_key-likes-block"
   );
 
+  // 1. Если лайковый блок уже есть — сразу инициализируем
   if (document.querySelector(targetSelector)) {
     safeInitDetailLikeView();
     return;
   }
 
+  // 2. Если контейнера нет — ждём его появления
   if (!cmsContainer) {
     setTimeout(observeWebflowLikeBlock, 200);
     return;
   }
 
+  // 3. Если лайковый блок появится позже — следим за контейнером
   const observer = new MutationObserver(() => {
     if (cmsContainer.querySelector(targetSelector)) {
       safeInitDetailLikeView();
