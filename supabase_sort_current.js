@@ -700,7 +700,6 @@ function initDetailLikeView() {
   likeWrap.addEventListener("click", likeClickHandler);
 }
 
-// --- Надёжная инициализация лайков на детальной странице через отложенный запуск ---
 function tryInitDetailLikeView() {
   if (document.querySelector(".idea-content_card-tags-likes-wrapper")) {
     initDetailLikeView();
@@ -710,3 +709,30 @@ function tryInitDetailLikeView() {
 }
 
 document.addEventListener("DOMContentLoaded", tryInitDetailLikeView);
+
+function observeWebflowLikeBlock() {
+  const cmsContainer = document.querySelector(
+    ".ideainner-hero_key-likes-block"
+  );
+  const targetSelector = ".idea-content_card-tags-likes-wrapper";
+
+  if (!cmsContainer) {
+    setTimeout(observeWebflowLikeBlock, 200);
+    return;
+  }
+
+  if (cmsContainer.querySelector(targetSelector)) {
+    initDetailLikeView();
+    return;
+  }
+
+  const observer = new MutationObserver(() => {
+    if (cmsContainer.querySelector(targetSelector)) {
+      initDetailLikeView();
+      observer.disconnect();
+    }
+  });
+  observer.observe(cmsContainer, { childList: true, subtree: true });
+}
+
+document.addEventListener("DOMContentLoaded", observeWebflowLikeBlock);
