@@ -33,7 +33,9 @@
   async function initLikeButtons() {
     if (!adapter) adapter = createAdapter();
     document
-      .querySelectorAll(".idea-content_card-tags-likes-wrapper")
+      .querySelectorAll(
+        ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile"
+      )
       .forEach((wrapper) => {
         if (wrapper.dataset.likeInit) return;
         wrapper.dataset.likeInit = "1";
@@ -619,3 +621,68 @@ document.addEventListener("DOMContentLoaded", () => {
     setupMutationObservers(debouncedListRefresh);
   });
 });
+
+// --- Инициализация лайков и просмотров на детальной странице (без изменений остального кода) ---
+function initDetailLikeView() {
+  const likeWrap = document.querySelector(
+    ".idea-content_card-tags-likes-wrapper"
+  );
+  const likeDigit = document.querySelector(
+    ".idea-content_card-tags-likes-text-digit"
+  );
+  const viewCount = document.querySelector(".view-count");
+  if (!likeWrap || !likeDigit || !viewCount) return;
+
+  const m = location.pathname.toLowerCase().match(/^\/library\/([^\/]+?)\/?$/);
+  if (!m) return;
+  const cardId = m[1];
+
+  // Получаем адаптер (используем уже существующий)
+  let adapter = window.adapter;
+  if (!adapter) {
+    if (window.supabaseInstance) {
+      adapter = new SupabaseAdapter(window.supabaseInstance);
+    } else {
+      adapter = new LocalAdapter();
+    }
+    window.adapter = adapter;
+  }
+
+  // Получаем и отображаем просмотры
+  adapter.trackView(cardId).then((vc) => {
+    viewCount.textContent = vc;
+  });
+
+  // Получаем и отображаем лайки
+  adapter.loadLikes(cardId).then(({ count, userLiked }) => {
+    likeDigit.textContent = count;
+    likeWrap.classList.toggle("liked", userLiked);
+  });
+
+  // Навешиваем обработчик лайка (если не навешен)
+  if (!likeWrap.dataset.detailLikeInit) {
+    likeWrap.dataset.detailLikeInit = "1";
+    likeWrap.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (likeWrap.classList.contains("loading")) return;
+      likeWrap.classList.add("loading");
+      const was = likeWrap.classList.contains("liked");
+      let old = parseInt(likeDigit.textContent || "0", 10);
+      try {
+        likeWrap.classList.toggle("liked", !was);
+        likeDigit.textContent = was ? old - 1 : old + 1;
+        const { count, userLiked } = await adapter.toggleLike(cardId);
+        likeWrap.classList.toggle("liked", userLiked);
+        likeDigit.textContent = count;
+      } catch (err) {
+        likeWrap.classList.toggle("liked", was);
+        likeDigit.textContent = old;
+      } finally {
+        likeWrap.classList.remove("loading");
+      }
+    });
+  }
+}
+
+document.addEventListener("DOMContentLoaded", initDetailLikeView);
