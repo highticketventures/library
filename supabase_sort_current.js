@@ -700,6 +700,21 @@ function initDetailLikeView() {
   likeWrap.addEventListener("click", likeClickHandler);
 }
 
+function safeInitDetailLikeView() {
+  const likeWrap = document.querySelector(
+    ".idea-content_card-tags-likes-wrapper"
+  );
+  const likeDigit = likeWrap?.querySelector(
+    ".idea-content_card-tags-likes-text-digit"
+  );
+  const viewCount = document.querySelector(".view-count");
+  if (!likeWrap || !likeDigit || !viewCount) {
+    setTimeout(safeInitDetailLikeView, 200);
+    return;
+  }
+  initDetailLikeView();
+}
+
 function observeWebflowLikeBlock() {
   const targetSelector = ".idea-content_card-tags-likes-wrapper";
   const cmsContainer = document.querySelector(
@@ -707,7 +722,7 @@ function observeWebflowLikeBlock() {
   );
 
   if (document.querySelector(targetSelector)) {
-    initDetailLikeView();
+    safeInitDetailLikeView();
     return;
   }
 
@@ -718,7 +733,7 @@ function observeWebflowLikeBlock() {
 
   const observer = new MutationObserver(() => {
     if (cmsContainer.querySelector(targetSelector)) {
-      initDetailLikeView();
+      safeInitDetailLikeView();
       observer.disconnect();
     }
   });
