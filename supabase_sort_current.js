@@ -701,18 +701,18 @@ function initDetailLikeView() {
 }
 
 function observeWebflowLikeBlock() {
+  const targetSelector = ".idea-content_card-tags-likes-wrapper";
   const cmsContainer = document.querySelector(
     ".ideainner-hero_key-likes-block"
   );
-  const targetSelector = ".idea-content_card-tags-likes-wrapper";
 
-  if (!cmsContainer) {
-    setTimeout(observeWebflowLikeBlock, 200);
+  if (document.querySelector(targetSelector)) {
+    initDetailLikeView();
     return;
   }
 
-  if (cmsContainer.querySelector(targetSelector)) {
-    initDetailLikeView();
+  if (!cmsContainer) {
+    setTimeout(observeWebflowLikeBlock, 200);
     return;
   }
 
