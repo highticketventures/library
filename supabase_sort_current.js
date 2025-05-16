@@ -609,7 +609,6 @@
   window.setupCustomSort = setupCustomSort;
   window.refreshListing = refreshListing;
 
-  // Экспортируем классы в window для глобального доступа
   window.SupabaseAdapter = SupabaseAdapter;
   window.LocalAdapter = LocalAdapter;
 })();
@@ -691,3 +690,11 @@ function initDetailLikeView() {
 }
 
 document.addEventListener("DOMContentLoaded", initDetailLikeView);
+
+if (!window.adapter) {
+  if (window.supabaseInstance) {
+    window.adapter = new window.SupabaseAdapter(window.supabaseInstance);
+  } else {
+    window.adapter = new window.LocalAdapter();
+  }
+}
