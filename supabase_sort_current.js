@@ -700,27 +700,13 @@ function initDetailLikeView() {
   likeWrap.addEventListener("click", likeClickHandler);
 }
 
-function observeLikeBlockAndInit() {
-  const targetSelector = ".idea-content_card-tags-likes-wrapper";
-  if (document.querySelector(targetSelector)) {
+// --- Надёжная инициализация лайков на детальной странице через отложенный запуск ---
+function tryInitDetailLikeView() {
+  if (document.querySelector(".idea-content_card-tags-likes-wrapper")) {
     initDetailLikeView();
-    return;
-  }
-  const observer = new MutationObserver(() => {
-    if (document.querySelector(targetSelector)) {
-      initDetailLikeView();
-      observer.disconnect();
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-}
-
-document.addEventListener("DOMContentLoaded", observeLikeBlockAndInit);
-
-if (!window.adapter) {
-  if (window.supabaseInstance) {
-    window.adapter = new window.SupabaseAdapter(window.supabaseInstance);
   } else {
-    window.adapter = new window.LocalAdapter();
+    setTimeout(tryInitDetailLikeView, 200);
   }
 }
+
+document.addEventListener("DOMContentLoaded", tryInitDetailLikeView);
