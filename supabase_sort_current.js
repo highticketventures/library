@@ -659,6 +659,7 @@ function initDetailLikeView() {
 
   // Получаем и отображаем лайки
   adapter.loadLikes(cardId).then(({ count, userLiked }) => {
+    console.log("loadLikes result", count, userLiked);
     likeDigit.textContent = count;
     likeWrap.classList.toggle("liked", userLiked);
   });
@@ -677,6 +678,7 @@ function initDetailLikeView() {
         likeWrap.classList.toggle("liked", !was);
         likeDigit.textContent = was ? old - 1 : old + 1;
         const { count, userLiked } = await adapter.toggleLike(cardId);
+        console.log("toggleLike result", count, userLiked);
         likeWrap.classList.toggle("liked", userLiked);
         likeDigit.textContent = count;
       } catch (err) {
