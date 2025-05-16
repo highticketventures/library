@@ -700,16 +700,6 @@ function initDetailLikeView() {
   likeWrap.addEventListener("click", likeClickHandler);
 }
 
-function tryInitDetailLikeView() {
-  if (document.querySelector(".idea-content_card-tags-likes-wrapper")) {
-    initDetailLikeView();
-  } else {
-    setTimeout(tryInitDetailLikeView, 200);
-  }
-}
-
-document.addEventListener("DOMContentLoaded", tryInitDetailLikeView);
-
 function observeWebflowLikeBlock() {
   const cmsContainer = document.querySelector(
     ".ideainner-hero_key-likes-block"
