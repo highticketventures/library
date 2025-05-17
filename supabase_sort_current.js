@@ -616,20 +616,32 @@
   window.LocalAdapter = LocalAdapter;
 })();
 
-// test change
-document.addEventListener("DOMContentLoaded", () => {
-  const debouncedListRefresh = debounce(refreshListing, 300);
-  window.SupabaseAPI.onReady(async () => {
-    const isDetail = await refreshDetail();
-    if (!isDetail) refreshListing();
-    setupCustomSort();
-    setupPeriodicUpdates(debouncedListRefresh);
-    setupEventListeners(debouncedListRefresh);
-    setupMutationObservers(debouncedListRefresh);
-  });
-});
+(function() {
+  const origPush = history.pushState;
+  history.pushState = function() {
+    const ret = origPush.apply(this, arguments);
+    window.dispatchEvent(new Event("locationchange"));
+    return ret;
+  };
 
-// Универсальный селектор для лайковых блоков
+  window.addEventListener("popstate", () =>
+    window.dispatchEvent(new Event("locationchange"))
+  );
+})();
+
+async function onSpaNavigation() {
+  const isDetail = await refreshDetail();
+  if (isDetail) {
+    safeInitDetailLikeView();
+  } else {
+    refreshListing();
+  }
+}
+
+onSpaNavigation();
+
+window.addEventListener("locationchange", onSpaNavigation);
+
 const LIKE_BLOCK_SELECTOR =
   ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
 
@@ -658,7 +670,6 @@ function initDetailLikeView() {
     viewCount.textContent = vc;
   });
 
-  // Для каждого лайкового блока инициализируем отображение и обработчик
   likeBlocks.forEach((likeWrap) => {
     const likeDigit = likeWrap.querySelector(
       ".idea-content_card-tags-likes-text-digit"
@@ -713,59 +724,3 @@ function safeInitDetailLikeView() {
   }
   initDetailLikeView();
 }
-
-function observeWebflowLikeBlock() {
-  const targetSelector = LIKE_BLOCK_SELECTOR;
-  const cmsContainer = document.querySelector(
-    ".ideainner-hero_key-likes-block"
-  );
-
-  // 1. Если лайковый блок уже есть — сразу инициализируем
-  if (document.querySelector(targetSelector)) {
-    safeInitDetailLikeView();
-    return;
-  }
-
-  // 2. Если контейнера нет — ждём его появления
-  if (!cmsContainer) {
-    setTimeout(observeWebflowLikeBlock, 200);
-    return;
-  }
-
-  // 3. Если лайковый блок появится позже — следим за контейнером
-  const observer = new MutationObserver(() => {
-    if (cmsContainer.querySelector(targetSelector)) {
-      safeInitDetailLikeView();
-      observer.disconnect();
-    }
-  });
-  observer.observe(cmsContainer, { childList: true, subtree: true });
-}
-
-document.addEventListener("DOMContentLoaded", observeWebflowLikeBlock);
-
-// --- Универсальный SPA-фиксер через History API ---
-(function() {
-  // Перехватим все вызовы history.pushState
-  const origPush = history.pushState;
-  history.pushState = function pushState() {
-    const ret = origPush.apply(this, arguments);
-    window.dispatchEvent(new Event("locationchange"));
-    return ret;
-  };
-  // Поправка для back/forward
-  window.addEventListener("popstate", () =>
-    window.dispatchEvent(new Event("locationchange"))
-  );
-})();
-
-// Обработчик на любое изменение URL в SPA
-window.addEventListener("locationchange", async () => {
-  // Попробуем применить логику «детальной страницы»
-  // (эта же функция вызывается при DOMContentLoaded):
-  const isDetail = await refreshDetail();
-  // Если это не «/library/:id», запускаем обновление списка
-  if (!isDetail) {
-    refreshListing();
-  }
-});
