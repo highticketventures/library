@@ -6,6 +6,7 @@
   let adapter = null;
   const DEBUG = false;
   let currentSortMode = "recent-desc";
+  window.currentSortMode = currentSortMode;
 
   window._debug_adapter = () => adapter;
 
@@ -260,6 +261,7 @@
         const sf = trigger.getAttribute("fs-cmssort-field");
         if (!sf) return;
         currentSortMode = sf;
+        window.currentSortMode = currentSortMode;
         waitForListAndSort(sf);
 
         const label = document.querySelector(
