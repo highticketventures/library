@@ -743,3 +743,14 @@ function observeWebflowLikeBlock() {
 }
 
 document.addEventListener("DOMContentLoaded", observeWebflowLikeBlock);
+
+// --- Автоматическая инициализация лайков при динамических переходах (SPA/Webflow) ---
+let lastPath = location.pathname;
+const spaLikeObserver = new MutationObserver(() => {
+  if (location.pathname !== lastPath) {
+    lastPath = location.pathname;
+    setTimeout(safeInitDetailLikeView, 200);
+  }
+});
+spaLikeObserver.observe(document.body, { childList: true, subtree: true });
+// --- Конец SPA фикса ---
