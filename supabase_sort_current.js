@@ -299,9 +299,11 @@
         November: "11",
         December: "12",
       };
-      const m = str.match(/^([A-Za-z]+) (\\d{1,2}), (\\d{4})$/);
-      if (!m) return "";
-      return `${m[3]}-${months[m[1]]}-${m[2].padStart(2, "0")}`;
+      const m = str.match(/^([A-Za-z]+) (\d{1,2}), (\d{4})$/);
+      if (!m) return 0;
+      return new Date(
+        `${m[3]}-${months[m[1]]}-${m[2].padStart(2, "0")}`
+      ).getTime();
     }
 
     function getValue(item) {
@@ -351,7 +353,7 @@
               ?.href.split("/library/")[1] || "";
           return ida.localeCompare(idb);
         }
-        return order === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+        return order === "asc" ? va - vb : vb - va;
       }
       return order === "asc" ? va - vb : vb - va;
     });
