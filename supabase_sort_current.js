@@ -696,7 +696,7 @@
         );
         initDetailLikeView();
       }
-    }, 250);
+    }, 1000);
     waitForDetailLikeBlocksAndInit();
     const debouncedListRefresh = debounce(refreshListing, 300);
     await handleRouteChange();
