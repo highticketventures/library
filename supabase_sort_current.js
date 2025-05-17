@@ -705,4 +705,6 @@
   window.SupabaseAdapter = SupabaseAdapter;
   window.LocalAdapter = LocalAdapter;
   window.LIKE_BLOCK_SELECTOR = LIKE_BLOCK_SELECTOR;
+  window.sortItems = sortItems;
+  window.setupCustomSort = setupCustomSort;
 })();
