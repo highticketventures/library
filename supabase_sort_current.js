@@ -718,4 +718,5 @@
   window.initDetailLikeView = initDetailLikeView;
   window.SupabaseAdapter = SupabaseAdapter;
   window.LocalAdapter = LocalAdapter;
+  window.LIKE_BLOCK_SELECTOR = LIKE_BLOCK_SELECTOR;
 })();
