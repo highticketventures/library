@@ -176,16 +176,18 @@
       .forEach((el) => safeSetText(el, vc));
 
     const { count, userLiked } = await adapter.loadLikes(cardId);
-    const wrap = document.querySelector(
-      `.idea-content_card-tags-likes-wrapper[data-card-id="${cardId}"]`
-    );
-    if (wrap) {
-      wrap.classList.toggle("liked", userLiked);
-      const txt = wrap.querySelector(
-        ".idea-content_card-tags-likes-text-digit"
-      );
-      safeSetText(txt, count);
-    }
+    [
+      `.idea-content_card-tags-likes-wrapper[data-card-id="${cardId}"]`,
+      `.idea-content_card-tags-likes-wrapper-mobile[data-card-id="${cardId}"]`,
+    ].forEach((selector) => {
+      document.querySelectorAll(selector).forEach((wrap) => {
+        wrap.classList.toggle("liked", userLiked);
+        const txt = wrap.querySelector(
+          ".idea-content_card-tags-likes-text-digit"
+        );
+        safeSetText(txt, count);
+      });
+    });
     return true;
   }
 
@@ -404,7 +406,13 @@
     const debouncedListRefresh = debounce(refreshListing, 300);
     (async function initPage() {
       const isDetail = await refreshDetail();
-      if (!isDetail) refreshListing();
+      if (isDetail) {
+        if (typeof window.initDetailLikeView === "function") {
+          window.initDetailLikeView();
+        }
+      } else {
+        refreshListing();
+      }
       setupCustomSort();
     })();
     setupPeriodicUpdates(debouncedListRefresh);
