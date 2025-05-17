@@ -349,9 +349,9 @@
               ?.href.split("/library/")[1] || "";
           return ida.localeCompare(idb);
         }
-        return order === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+        return order === "desc" ? va.localeCompare(vb) : vb.localeCompare(va);
       }
-      return order === "asc" ? va - vb : vb - va;
+      return order === "desc" ? va - vb : vb - va;
     });
 
     const newOrder = items
