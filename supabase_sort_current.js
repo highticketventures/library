@@ -138,14 +138,19 @@
         ".idea-content_card-tags-likes-wrapper",
         ".idea-content_card-tags-likes-wrapper-mobile",
       ].forEach((selector) => {
-        const wrap = item.querySelector(selector);
-        if (wrap) {
-          wrap.classList.toggle("liked", !!userLikedMap[id]);
-          const txt = wrap.querySelector(
-            ".idea-content_card-tags-likes-text-digit"
-          );
-          safeSetText(txt, likesMap[id] || 0);
-        }
+        item.querySelectorAll(selector).forEach((wrap) => {
+          // Только для реально видимых блоков
+          if (
+            wrap.offsetParent !== null &&
+            window.getComputedStyle(wrap).display !== "none"
+          ) {
+            wrap.classList.toggle("liked", !!userLikedMap[id]);
+            const txt = wrap.querySelector(
+              ".idea-content_card-tags-likes-text-digit"
+            );
+            safeSetText(txt, likesMap[id] || 0);
+          }
+        });
       });
     });
 
