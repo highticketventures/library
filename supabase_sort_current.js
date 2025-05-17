@@ -688,15 +688,20 @@
 
   // Первая инициализация
   document.addEventListener("DOMContentLoaded", async () => {
-    setTimeout(() => {
+    // Polling для гарантированной инициализации лайков на детальной странице
+    let tries = 0;
+    const maxTries = 20; // до 10 секунд
+    const interval = setInterval(() => {
       const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
-      if (likeBlocks.length) {
-        console.log(
-          "LIKE_BLOCKS FOUND VIA TIMEOUT, CALLING initDetailLikeView"
-        );
-        initDetailLikeView();
+      if (likeBlocks.length && window.initDetailLikeView) {
+        console.log("Polling: лайк-блоки найдены, инициализируем!");
+        window.initDetailLikeView();
+        clearInterval(interval);
       }
-    }, 1000);
+      tries++;
+      if (tries > maxTries) clearInterval(interval);
+    }, 500);
+
     waitForDetailLikeBlocksAndInit();
     const debouncedListRefresh = debounce(refreshListing, 300);
     await handleRouteChange();
