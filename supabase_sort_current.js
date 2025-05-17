@@ -1,4 +1,5 @@
 (function() {
+  console.log("DOMContentLoaded CALLED");
   // === КОНСТАНТЫ И ПЕРЕМЕННЫЕ ===
   const LIKE_BLOCK_SELECTOR =
     ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
