@@ -154,16 +154,24 @@
       .forEach((el) => safeSetText(el, vc));
 
     const { count, userLiked } = await adapter.loadLikes(cardId);
-    const wrap = document.querySelector(
-      `.idea-content_card-tags-likes-wrapper[data-card-id="${cardId}"]`
-    );
-    if (wrap) {
-      wrap.classList.toggle("liked", userLiked);
-      const txt = wrap.querySelector(
-        ".idea-content_card-tags-likes-text-digit"
-      );
-      safeSetText(txt, count);
-    }
+
+    // Обновляем оба блока: десктопный и мобильный
+    document
+      .querySelectorAll(
+        '.idea-content_card-tags-likes-wrapper[data-card-id="' +
+          cardId +
+          '"], .idea-content_card-tags-likes-wrapper-mobile[data-card-id="' +
+          cardId +
+          '"]'
+      )
+      .forEach((wrap) => {
+        wrap.classList.toggle("liked", userLiked);
+        const txt = wrap.querySelector(
+          ".idea-content_card-tags-likes-text-digit"
+        );
+        safeSetText(txt, count);
+      });
+
     return true;
   }
 
