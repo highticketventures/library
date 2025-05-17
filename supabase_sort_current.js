@@ -88,6 +88,20 @@
     if (!adapter) adapter = createAdapter();
 
     const items = Array.from(document.querySelectorAll(".w-dyn-item"));
+    console.log("[Like] refreshListing: найдено .w-dyn-item:", items.length);
+    items.forEach((item, idx) => {
+      const mobileLike = item.querySelector(
+        ".idea-content_card-tags-likes-wrapper-mobile"
+      );
+      if (mobileLike) {
+        console.log(
+          `[Like] В item #${idx} найден мобильный лайк-блок`,
+          mobileLike
+        );
+      } else {
+        console.warn(`[Like] В item #${idx} мобильный лайк-блок НЕ найден`);
+      }
+    });
     const ids = Array.from(
       new Set(
         items
