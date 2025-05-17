@@ -403,16 +403,15 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    if (/^\/library\/[^\/]+\/?$/.test(location.pathname.toLowerCase())) {
+      if (typeof window.initDetailLikeView === "function") {
+        window.initDetailLikeView();
+      }
+    }
     const debouncedListRefresh = debounce(refreshListing, 300);
     (async function initPage() {
       const isDetail = await refreshDetail();
-      if (isDetail) {
-        if (typeof window.initDetailLikeView === "function") {
-          window.initDetailLikeView();
-        }
-      } else {
-        refreshListing();
-      }
+      if (!isDetail) refreshListing();
       setupCustomSort();
     })();
     setupPeriodicUpdates(debouncedListRefresh);
@@ -424,7 +423,6 @@
       document.querySelector(".w-dyn-items");
     if (dynList) {
       new MutationObserver((mutationsList) => {
-        // Проверяем, появились ли новые мобильные лайк-блоки
         const addedMobileLikes = mutationsList.some((mutation) =>
           Array.from(mutation.addedNodes).some(
             (node) =>
