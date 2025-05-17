@@ -744,16 +744,28 @@ function observeWebflowLikeBlock() {
 
 document.addEventListener("DOMContentLoaded", observeWebflowLikeBlock);
 
-// --- Автоматическая инициализация лайков при переходах на Webflow через .page-wrapper ---
-let lastPath = location.pathname;
-const pageWrapper = document.querySelector(".page-wrapper");
-if (pageWrapper) {
-  const spaLikeObserver = new MutationObserver(() => {
-    if (location.pathname !== lastPath) {
-      lastPath = location.pathname;
-      setTimeout(safeInitDetailLikeView, 200);
-    }
-  });
-  spaLikeObserver.observe(pageWrapper, { childList: true, subtree: true });
-}
-// --- Конец SPA фикса ---
+// --- Универсальный SPA-фиксер через History API ---
+(function() {
+  // Перехватим все вызовы history.pushState
+  const origPush = history.pushState;
+  history.pushState = function pushState() {
+    const ret = origPush.apply(this, arguments);
+    window.dispatchEvent(new Event("locationchange"));
+    return ret;
+  };
+  // Поправка для back/forward
+  window.addEventListener("popstate", () =>
+    window.dispatchEvent(new Event("locationchange"))
+  );
+})();
+
+// Обработчик на любое изменение URL в SPA
+window.addEventListener("locationchange", async () => {
+  // Попробуем применить логику «детальной страницы»
+  // (эта же функция вызывается при DOMContentLoaded):
+  const isDetail = await refreshDetail();
+  // Если это не «/library/:id», запускаем обновление списка
+  if (!isDetail) {
+    refreshListing();
+  }
+});
