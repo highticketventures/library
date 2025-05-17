@@ -672,6 +672,7 @@
     const observer = new MutationObserver(() => {
       const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
       if (likeBlocks.length) {
+        console.log("LIKE_BLOCKS FOUND, CALLING initDetailLikeView");
         observer.disconnect();
         initDetailLikeView();
       }
@@ -679,6 +680,7 @@
     observer.observe(document.body, { childList: true, subtree: true });
     // На случай если лайк-блоки уже есть
     if (document.querySelectorAll(LIKE_BLOCK_SELECTOR).length) {
+      console.log("LIKE_BLOCKS FOUND IMMEDIATELY, CALLING initDetailLikeView");
       observer.disconnect();
       initDetailLikeView();
     }
