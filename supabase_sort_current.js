@@ -1,6 +1,6 @@
 (function() {
   console.log("DOMContentLoaded CALLED");
-  // === КОНСТАНТЫ И ПЕРЕМЕННЫЕ ===
+  // === CONSTANTS AND VARIABLES ===
   const LIKE_BLOCK_SELECTOR =
     ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
   let adapter = null;
@@ -10,7 +10,7 @@
 
   window._debug_adapter = () => adapter;
 
-  // === ВСПОМОГАТЕЛИ ===
+  // === HELPERS ===
   function debug(...args) {
     if (DEBUG) console.log("[card-stats]", ...args);
   }
@@ -35,7 +35,7 @@
       : new LocalAdapter();
   }
 
-  // === ЛАЙКИ НА СПИСКЕ КАРТОЧЕК ===
+  // === LIKES ON CARD LIST ===
   async function initLikeButtons() {
     if (!adapter) adapter = createAdapter();
     document.querySelectorAll(LIKE_BLOCK_SELECTOR).forEach((wrapper) => {
@@ -62,7 +62,7 @@
         const was = wrapper.classList.contains("liked");
 
         try {
-          // оптимистично обновляем UI
+          // optimistically update UI
           wrapper.classList.toggle("liked", !was);
           safeSetText(txtEl, was ? old - 1 : old + 1);
 
@@ -71,14 +71,14 @@
           wrapper.classList.toggle("liked", userLiked);
           safeSetText(txtEl, count);
 
-          // если сейчас сортировка по популярности — обновляем порядок
+          // if current sorting is by popularity — update order
           if (currentSortMode.startsWith("popular-")) {
             const list = document.querySelector('[fs-cmssort-element="list"]');
             if (list) sortItems(list, currentSortMode);
           }
         } catch (err) {
           debug("toggleLike failed:", err);
-          // откатываем
+          // rollback
           wrapper.classList.toggle("liked", was);
           safeSetText(txtEl, old);
         } finally {
@@ -88,7 +88,7 @@
     });
   }
 
-  // === ОБНОВЛЕНИЕ СПИСКА КАРТОЧЕК ===
+  // === CARD LIST REFRESH ===
   async function refreshListing() {
     if (!adapter) adapter = createAdapter();
 
@@ -120,12 +120,12 @@
       const href = item.querySelector('a[href*="/library/"]')?.href || "";
       const id = href.split("/library/")[1] || "";
 
-      // просмотры
+      // views
       item
         .querySelectorAll(".view-count")
         .forEach((el) => safeSetText(el, viewsMap[id] || 0));
 
-      // лайки
+      // likes
       item.querySelectorAll(LIKE_BLOCK_SELECTOR).forEach((wrap) => {
         wrap.classList.toggle("liked", !!userLikedMap[id]);
         safeSetText(
@@ -141,7 +141,7 @@
     document.dispatchEvent(new CustomEvent("fs-cmssort:load"));
   }
 
-  // === ОБНОВЛЕНИЕ ДЕТАЛЬНОЙ СТРАНИЦЫ ===
+  // === DETAIL PAGE REFRESH ===
   async function refreshDetail() {
     if (!adapter) adapter = createAdapter();
 
@@ -151,13 +151,13 @@
     if (!m) return false;
     const cardId = m[1];
 
-    // просмотры
+    // views
     const vc = await adapter.trackView(cardId);
     document
       .querySelectorAll(".view-count")
       .forEach((el) => safeSetText(el, vc));
 
-    // лайки
+    // likes
     const { count, userLiked } = await adapter.loadLikes(cardId);
     document
       .querySelectorAll(`${LIKE_BLOCK_SELECTOR}[data-card-id="${cardId}"]`)
@@ -172,7 +172,7 @@
     return true;
   }
 
-  // === НАВЕШИВАЕМ CLICK-ХЕНДЛЕРЫ НА ДЕТАЛЬНОЙ СТРАНИЦЕ ===
+  // === CLICK HANDLERS ON DETAIL PAGE ===
   function initDetailLikeView() {
     console.log("initDetailLikeView CALLED");
     const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
@@ -187,12 +187,12 @@
 
     if (!adapter) adapter = createAdapter();
 
-    // Проставляем data-card-id для всех лайк-блоков
+    // Set data-card-id for all like blocks
     likeBlocks.forEach((wrap) => {
       wrap.dataset.cardId = cardId;
     });
 
-    // показываем просмотры (опционально обновляет ещё раз)
+    // show views (optionally updates again)
     adapter.trackView(cardId).then((vc) => {
       viewCount.textContent = vc;
     });
@@ -203,13 +203,13 @@
       );
       if (!digit) return;
 
-      // показываем лайки
+      // show likes
       adapter.loadLikes(cardId).then(({ count, userLiked }) => {
         digit.textContent = count;
         wrap.classList.toggle("liked", userLiked);
       });
 
-      // если ещё не повесили клик
+      // if not already attached click handler
       if (!wrap.dataset.detailLikeInit) {
         wrap.dataset.detailLikeInit = "1";
         wrap.addEventListener("click", async (e) => {
@@ -236,7 +236,7 @@
     });
   }
 
-  // === СОРТИРОВКА ===
+  // === SORTING ===
   function setupCustomSort() {
     const triggerContainer = document.querySelector(
       '[fs-cmssort-element="trigger"]'
@@ -342,7 +342,7 @@
         vb = getValue(b);
       if (field === "recent") {
         if (va === vb) {
-          // fallback: сортируем по id, чтобы порядок всегда менялся
+          // fallback: sort by id to ensure order always changes
           const ida =
             a
               .querySelector('a[href*="/library/"]')
@@ -381,7 +381,7 @@
     tryFind();
   }
 
-  // === ПЕРИОДИЧЕСКИЕ ОБНОВЛЕНИЯ, ЛИСТЕНЕРЫ И ОБСЕРВЕРЫ ===
+  // === PERIODIC UPDATES, LISTENERS AND OBSERVERS ===
   function setupPeriodicUpdates(debouncedRefresh) {
     window._cardStatsInterval = setInterval(() => {
       const isDetail = !!location.pathname
@@ -450,7 +450,7 @@
     }
   }
 
-  // === АДАПТЕРЫ ===
+  // === ADAPTERS ===
   class SupabaseAdapter {
     constructor(supabase) {
       this.supabase = supabase;
@@ -665,14 +665,14 @@
     }
   }
 
-  // === ОБЩИЙ РОУТЕР ===
+  // === GENERAL ROUTER ===
   async function handleRouteChange() {
     const isDetail = await refreshDetail();
     if (isDetail) initDetailLikeView();
     else refreshListing();
   }
 
-  // Перехват History API
+  // Intercept History API
   (function() {
     const evt = new Event("locationchange");
     const orig = history.pushState;
@@ -696,7 +696,7 @@
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    // На случай если лайк-блоки уже есть
+    // In case like blocks already exist
     if (document.querySelectorAll(LIKE_BLOCK_SELECTOR).length) {
       console.log("LIKE_BLOCKS FOUND IMMEDIATELY, CALLING initDetailLikeView");
       observer.disconnect();
@@ -704,7 +704,7 @@
     }
   }
 
-  // Первая инициализация
+  // First initialization
   document.addEventListener("DOMContentLoaded", async () => {
     waitForDetailLikeBlocksAndInit();
     const debouncedListRefresh = debounce(refreshListing, 300);
@@ -715,7 +715,7 @@
     setupMutationObservers(debouncedListRefresh);
   });
 
-  // Экспорт для консоли/доп. вызовов
+  // Export for console/additional calls
   window.refreshListing = refreshListing;
   window.refreshDetail = refreshDetail;
   window.initLikeButtons = initLikeButtons;
