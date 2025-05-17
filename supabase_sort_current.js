@@ -337,6 +337,18 @@
       const va = getValue(a),
         vb = getValue(b);
       if (field === "recent") {
+        if (va === vb) {
+          // fallback: сортируем по id, чтобы порядок всегда менялся
+          const ida =
+            a
+              .querySelector('a[href*="/library/"]')
+              ?.href.split("/library/")[1] || "";
+          const idb =
+            b
+              .querySelector('a[href*="/library/"]')
+              ?.href.split("/library/")[1] || "";
+          return ida.localeCompare(idb);
+        }
         return order === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
       }
       return order === "asc" ? va - vb : vb - va;
