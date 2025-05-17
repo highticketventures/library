@@ -410,6 +410,26 @@
     setupPeriodicUpdates(debouncedListRefresh);
     setupEventListeners(debouncedListRefresh);
     setupMutationObservers(debouncedListRefresh);
+
+    const dynList =
+      document.querySelector(".w-dyn-list") ||
+      document.querySelector(".w-dyn-items");
+    if (dynList) {
+      new MutationObserver((mutationsList) => {
+        // Проверяем, появились ли новые мобильные лайк-блоки
+        const addedMobileLikes = mutationsList.some((mutation) =>
+          Array.from(mutation.addedNodes).some(
+            (node) =>
+              node.nodeType === 1 &&
+              node.querySelector &&
+              node.querySelector(".idea-content_card-tags-likes-wrapper-mobile")
+          )
+        );
+        if (addedMobileLikes) {
+          window.refreshListing();
+        }
+      }).observe(dynList, { childList: true, subtree: true });
+    }
   });
 
   class SupabaseAdapter {
