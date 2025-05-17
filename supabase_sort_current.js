@@ -119,14 +119,20 @@
       const vEl = item.querySelector(".view-count");
       safeSetText(vEl, viewsMap[id] || 0);
 
-      const wrap = item.querySelector(".idea-content_card-tags-likes-wrapper");
-      if (wrap) {
-        wrap.classList.toggle("liked", !!userLikedMap[id]);
-        const txt = wrap.querySelector(
-          ".idea-content_card-tags-likes-text-digit"
-        );
-        safeSetText(txt, likesMap[id] || 0);
-      }
+      // Обновляем оба лайк-блока (десктоп и мобилка)
+      [
+        ".idea-content_card-tags-likes-wrapper",
+        ".idea-content_card-tags-likes-wrapper-mobile",
+      ].forEach((selector) => {
+        const wrap = item.querySelector(selector);
+        if (wrap) {
+          wrap.classList.toggle("liked", !!userLikedMap[id]);
+          const txt = wrap.querySelector(
+            ".idea-content_card-tags-likes-text-digit"
+          );
+          safeSetText(txt, likesMap[id] || 0);
+        }
+      });
     });
 
     initLikeButtons();
