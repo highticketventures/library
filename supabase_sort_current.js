@@ -402,6 +402,8 @@
   window.setupCustomSort = setupCustomSort;
   window.refreshListing = refreshListing;
   window.refreshDetail = refreshDetail;
+  window.initDetailLikeView = initDetailLikeView;
+  window.safeInitDetailLikeView = safeInitDetailLikeView;
   window.SupabaseAdapter = SupabaseAdapter;
   window.LocalAdapter = LocalAdapter;
 })();
