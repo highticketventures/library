@@ -688,19 +688,29 @@
 
   // Первая инициализация
   document.addEventListener("DOMContentLoaded", async () => {
-    // Polling для гарантированной инициализации лайков на детальной странице
-    let tries = 0;
-    const maxTries = 20; // до 10 секунд
-    const interval = setInterval(() => {
-      const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
-      if (likeBlocks.length && window.initDetailLikeView) {
-        console.log("Polling: лайк-блоки найдены, инициализируем!");
-        window.initDetailLikeView();
-        clearInterval(interval);
+    // Лучшая практика: ждём появления функции, потом polling DOM
+    let waitTries = 0;
+    const waitMaxTries = 20;
+    const waitInterval = setInterval(() => {
+      if (typeof window.initDetailLikeView === "function") {
+        clearInterval(waitInterval);
+        let tries = 0;
+        const maxTries = 20;
+        const interval = setInterval(() => {
+          const likeBlocks = document.querySelectorAll(
+            window.LIKE_BLOCK_SELECTOR
+          );
+          if (likeBlocks.length) {
+            window.initDetailLikeView();
+            clearInterval(interval);
+          }
+          tries++;
+          if (tries > maxTries) clearInterval(interval);
+        }, 500);
       }
-      tries++;
-      if (tries > maxTries) clearInterval(interval);
-    }, 500);
+      waitTries++;
+      if (waitTries > waitMaxTries) clearInterval(waitInterval);
+    }, 250);
 
     waitForDetailLikeBlocksAndInit();
     const debouncedListRefresh = debounce(refreshListing, 300);
