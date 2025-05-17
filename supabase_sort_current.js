@@ -688,6 +688,15 @@
 
   // Первая инициализация
   document.addEventListener("DOMContentLoaded", async () => {
+    setTimeout(() => {
+      const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
+      if (likeBlocks.length) {
+        console.log(
+          "LIKE_BLOCKS FOUND VIA TIMEOUT, CALLING initDetailLikeView"
+        );
+        initDetailLikeView();
+      }
+    }, 250);
     waitForDetailLikeBlocksAndInit();
     const debouncedListRefresh = debounce(refreshListing, 300);
     await handleRouteChange();
