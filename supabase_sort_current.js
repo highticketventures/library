@@ -134,6 +134,7 @@
 
     initLikeButtons();
     waitForListAndSort(currentSortMode);
+    setupCustomSort();
     document.dispatchEvent(new CustomEvent("fs-cmssort:load"));
   }
 
