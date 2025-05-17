@@ -436,6 +436,7 @@ async function onSpaNavigation() {
 onSpaNavigation();
 window.addEventListener("locationchange", onSpaNavigation);
 
+// --- Глобальные функции для лайков ---
 const LIKE_BLOCK_SELECTOR =
   ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
 
