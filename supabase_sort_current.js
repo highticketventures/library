@@ -744,13 +744,16 @@ function observeWebflowLikeBlock() {
 
 document.addEventListener("DOMContentLoaded", observeWebflowLikeBlock);
 
-// --- Автоматическая инициализация лайков при динамических переходах (SPA/Webflow) ---
+// --- Автоматическая инициализация лайков при переходах на Webflow через .page-wrapper ---
 let lastPath = location.pathname;
-const spaLikeObserver = new MutationObserver(() => {
-  if (location.pathname !== lastPath) {
-    lastPath = location.pathname;
-    setTimeout(safeInitDetailLikeView, 200);
-  }
-});
-spaLikeObserver.observe(document.body, { childList: true, subtree: true });
+const pageWrapper = document.querySelector(".page-wrapper");
+if (pageWrapper) {
+  const spaLikeObserver = new MutationObserver(() => {
+    if (location.pathname !== lastPath) {
+      lastPath = location.pathname;
+      setTimeout(safeInitDetailLikeView, 200);
+    }
+  });
+  spaLikeObserver.observe(pageWrapper, { childList: true, subtree: true });
+}
 // --- Конец SPA фикса ---
