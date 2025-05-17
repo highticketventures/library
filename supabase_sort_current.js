@@ -181,6 +181,11 @@
 
     if (!adapter) adapter = createAdapter();
 
+    // Проставляем data-card-id для всех лайк-блоков
+    likeBlocks.forEach((wrap) => {
+      wrap.dataset.cardId = cardId;
+    });
+
     // показываем просмотры (опционально обновляет ещё раз)
     adapter.trackView(cardId).then((vc) => {
       viewCount.textContent = vc;
@@ -308,8 +313,7 @@
         );
       }
       if (field === "recent") {
-        return;
-        toSortableDate(
+        return toSortableDate(
           item.querySelector('[fs-cmssort-field="recent"]')?.textContent || ""
         );
       }
