@@ -2,86 +2,6 @@
 const LIKE_BLOCK_SELECTOR =
   ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
 
-function initDetailLikeView() {
-  const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
-  if (!likeBlocks.length) return;
-
-  const viewCount = document.querySelector(".view-count");
-  if (!viewCount) return;
-
-  const m = location.pathname.toLowerCase().match(/^\/library\/([^\/]+?)\/?$/);
-  if (!m) return;
-  const cardId = m[1];
-
-  let adapter = window.adapter;
-  if (!adapter) {
-    if (window.supabaseInstance) {
-      adapter = new SupabaseAdapter(window.supabaseInstance);
-    } else {
-      adapter = new LocalAdapter();
-    }
-    window.adapter = adapter;
-  }
-
-  adapter.trackView(cardId).then((vc) => {
-    viewCount.textContent = vc;
-  });
-
-  likeBlocks.forEach((likeWrap) => {
-    const likeDigit = likeWrap.querySelector(
-      ".idea-content_card-tags-likes-text-digit"
-    );
-    if (!likeDigit) return;
-
-    adapter.loadLikes(cardId).then(({ count, userLiked }) => {
-      likeDigit.textContent = count;
-      likeWrap.classList.toggle("liked", userLiked);
-    });
-
-    function likeClickHandler(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (likeWrap.classList.contains("loading")) return;
-      likeWrap.classList.add("loading");
-      const was = likeWrap.classList.contains("liked");
-      let old = parseInt(likeDigit.textContent || "0", 10);
-      try {
-        likeWrap.classList.toggle("liked", !was);
-        likeDigit.textContent = was ? old - 1 : old + 1;
-        adapter
-          .toggleLike(cardId)
-          .then(({ count, userLiked }) => {
-            likeWrap.classList.toggle("liked", userLiked);
-            likeDigit.textContent = count;
-          })
-          .catch(() => {
-            likeWrap.classList.toggle("liked", was);
-            likeDigit.textContent = old;
-          })
-          .finally(() => {
-            likeWrap.classList.remove("loading");
-          });
-      } catch (err) {
-        likeWrap.classList.toggle("liked", was);
-        likeDigit.textContent = old;
-        likeWrap.classList.remove("loading");
-      }
-    }
-    likeWrap.removeEventListener("click", likeClickHandler);
-    likeWrap.addEventListener("click", likeClickHandler);
-  });
-}
-
-function safeInitDetailLikeView() {
-  const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
-  const viewCount = document.querySelector(".view-count");
-  if (!likeBlocks.length || !viewCount) {
-    setTimeout(safeInitDetailLikeView, 200);
-    return;
-  }
-  initDetailLikeView();
-}
-
 (function() {
   let adapter = null;
   const DEBUG = false;
@@ -114,149 +34,153 @@ function safeInitDetailLikeView() {
     return new LocalAdapter();
   }
 
-  async function initLikeButtons() {
+  function initLikeButtons() {
     if (!adapter) adapter = createAdapter();
-    document
-      .querySelectorAll(
-        ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile"
-      )
-      .forEach((wrapper) => {
-        if (wrapper.dataset.likeInit) return;
-        wrapper.dataset.likeInit = "1";
-        const href =
-          wrapper.closest(".w-dyn-item")?.querySelector('a[href*="/library/"]')
-            ?.href || "";
-        const cardId = href.split("/library/")[1] || "";
-        if (!cardId) return;
-        wrapper.dataset.cardId = cardId;
+    document.querySelectorAll(LIKE_BLOCK_SELECTOR).forEach((wrapper) => {
+      if (wrapper.dataset.likeInit) return;
+      wrapper.dataset.likeInit = "1";
+      const href =
+        wrapper.closest(".w-dyn-item")?.querySelector('a[href*="/library/"]')
+          ?.href || "";
+      const cardId = href.split("/library/")[1] || "";
+      if (!cardId) return;
+      wrapper.dataset.cardId = cardId;
 
-        wrapper.addEventListener("click", async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (wrapper.classList.contains("loading")) return;
-
-          const txtEl = wrapper.querySelector(
-            ".idea-content_card-tags-likes-text-digit"
-          );
-          const old = parseInt(txtEl?.textContent || "0", 10);
-          const was = wrapper.classList.contains("liked");
-          wrapper.classList.add("loading");
-
-          try {
-            wrapper.classList.toggle("liked", !was);
-            safeSetText(txtEl, was ? old - 1 : old + 1);
-
-            const { count, userLiked } = await adapter.toggleLike(cardId);
-
-            wrapper.classList.toggle("liked", userLiked);
-            safeSetText(txtEl, count);
-
-            if (currentSortMode.startsWith("popular-")) {
-              const list = document.querySelector(
-                '[fs-cmssort-element="list"]'
-              );
-              if (list) sortItems(list, currentSortMode);
-            }
-          } catch (err) {
-            debug("toggleLike failed:", err);
-            wrapper.classList.toggle("liked", was);
-            safeSetText(txtEl, old);
-          } finally {
-            wrapper.classList.remove("loading");
-          }
-        });
+      wrapper.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (wrapper.classList.contains("loading")) return;
+        wrapper.classList.add("loading");
+        const digitEl = wrapper.querySelector(
+          ".idea-content_card-tags-likes-text-digit"
+        );
+        const old = parseInt(digitEl?.textContent || "0", 10);
+        const was = wrapper.classList.contains("liked");
+        wrapper.classList.toggle("liked", !was);
+        safeSetText(digitEl, was ? old - 1 : old + 1);
+        try {
+          const { count, userLiked } = await adapter.toggleLike(cardId);
+          wrapper.classList.toggle("liked", userLiked);
+          safeSetText(digitEl, count);
+        } catch (err) {
+          debug("toggleLike failed:", err);
+          wrapper.classList.toggle("liked", was);
+          safeSetText(digitEl, old);
+        } finally {
+          wrapper.classList.remove("loading");
+        }
       });
+    });
   }
 
   async function refreshListing() {
     if (!adapter) adapter = createAdapter();
-
     const items = Array.from(document.querySelectorAll(".w-dyn-item"));
     const ids = Array.from(
       new Set(
         items
           .map(
-            (it) =>
-              it
+            (i) =>
+              i
                 .querySelector('a[href*="/library/"]')
-                ?.href.split("/library/")[1] || ""
+                ?.href.split("/library/")[1]
           )
           .filter(Boolean)
       )
     );
     if (!ids.length) return;
-
     let stats;
     try {
       stats = await adapter.loadStatsForList(ids);
-    } catch (err) {
-      debug("partial stats failed, fallback to full:", err);
+    } catch (e) {
+      debug("loadStatsForList failed:", e);
       stats = await adapter.loadAllStats();
     }
-
     const { likesMap, userLikedMap, viewsMap } = stats;
-
     items.forEach((item) => {
-      const href = item.querySelector('a[href*="/library/"]')?.href || "";
-      const id = href.split("/library/")[1] || "";
-
-      const vEl = item.querySelector(".view-count");
-      safeSetText(vEl, viewsMap[id] || 0);
-
-      // Новый универсальный обработчик для всех лайковых блоков
-      const likeBlocks = item.querySelectorAll(
-        ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile"
-      );
-      likeBlocks.forEach((wrap) => {
-        wrap.classList.toggle("liked", !!userLikedMap[id]);
-        const txt = wrap.querySelector(
-          ".idea-content_card-tags-likes-text-digit"
+      const id =
+        item
+          .querySelector('a[href*="/library/"]')
+          ?.href.split("/library/")[1] || "";
+      safeSetText(item.querySelector(".view-count"), viewsMap[id] || 0);
+      item.querySelectorAll(LIKE_BLOCK_SELECTOR).forEach((w) => {
+        w.classList.toggle("liked", !!userLikedMap[id]);
+        safeSetText(
+          w.querySelector(".idea-content_card-tags-likes-text-digit"),
+          likesMap[id] || 0
         );
-        safeSetText(txt, likesMap[id] || 0);
       });
     });
-
     initLikeButtons();
-
     waitForListAndSort(currentSortMode);
-
     document.dispatchEvent(new CustomEvent("fs-cmssort:load"));
   }
 
   async function refreshDetail() {
     if (!adapter) adapter = createAdapter();
-
     const m = location.pathname
       .toLowerCase()
       .match(/^\/library\/([^\/]+?)\/?$/);
     if (!m) return false;
-
     const cardId = m[1];
     const vc = await adapter.trackView(cardId);
     document
       .querySelectorAll(".view-count")
       .forEach((el) => safeSetText(el, vc));
-
     const { count, userLiked } = await adapter.loadLikes(cardId);
-
-    // Обновляем оба блока: десктопный и мобильный
     document
       .querySelectorAll(
-        '.idea-content_card-tags-likes-wrapper[data-card-id="' +
-          cardId +
-          '"], .idea-content_card-tags-likes-wrapper-mobile[data-card-id="' +
-          cardId +
-          '"]'
+        `[data-card-id="${cardId}"]${
+          LIKE_BLOCK_SELECTOR.includes("mobile")
+            ? "," + LIKE_BLOCK_SELECTOR + "[data-card-id='" + cardId + "']"
+            : ""
+        }`
       )
-      .forEach((wrap) => {
-        wrap.classList.toggle("liked", userLiked);
-        const txt = wrap.querySelector(
-          ".idea-content_card-tags-likes-text-digit"
+      .forEach((w) => {
+        w.classList.toggle("liked", userLiked);
+        safeSetText(
+          w.querySelector(".idea-content_card-tags-likes-text-digit"),
+          count
         );
-        safeSetText(txt, count);
       });
-
     return true;
+  }
+
+  function initDetailLikeView() {
+    const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
+    if (!likeBlocks.length) return;
+    const m = location.pathname
+      .toLowerCase()
+      .match(/^\/library\/([^\/]+?)\/?$/);
+    if (!m) return;
+    const cardId = m[1];
+    likeBlocks.forEach((likeWrap) => {
+      if (likeWrap.dataset.cardId !== cardId) return;
+      const likeDigit = likeWrap.querySelector(
+        ".idea-content_card-tags-likes-text-digit"
+      );
+      if (!likeDigit) return;
+      likeWrap.addEventListener("click", async function likeClickHandler(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (likeWrap.classList.contains("loading")) return;
+        likeWrap.classList.add("loading");
+        const was = likeWrap.classList.contains("liked");
+        let old = parseInt(likeDigit.textContent || "0", 10);
+        try {
+          likeWrap.classList.toggle("liked", !was);
+          likeDigit.textContent = was ? old - 1 : old + 1;
+          const { count, userLiked } = await adapter.toggleLike(cardId);
+          likeWrap.classList.toggle("liked", userLiked);
+          likeDigit.textContent = count;
+        } catch (err) {
+          likeWrap.classList.toggle("liked", was);
+          likeDigit.textContent = old;
+        } finally {
+          likeWrap.classList.remove("loading");
+        }
+      });
+    });
   }
 
   function setupCustomSort() {
@@ -487,35 +411,34 @@ function safeInitDetailLikeView() {
   window.refreshListing = refreshListing;
   window.refreshDetail = refreshDetail;
   window.initDetailLikeView = initDetailLikeView;
-  window.safeInitDetailLikeView = safeInitDetailLikeView;
+  window.initLikeButtons = initLikeButtons;
   window.SupabaseAdapter = SupabaseAdapter;
   window.LocalAdapter = LocalAdapter;
 })();
 
-// --- Универсальный SPA-роутер через History API ---
-(function() {
-  // Перехват pushState
-  const origPush = history.pushState;
-  history.pushState = function() {
-    const ret = origPush.apply(this, arguments);
-    window.dispatchEvent(new Event("locationchange"));
-    return ret;
-  };
-  // Перехват back/forward
-  window.addEventListener("popstate", () =>
-    window.dispatchEvent(new Event("locationchange"))
-  );
-})();
-
-// На каждое изменение URL в SPA
-async function onSpaNavigation() {
-  const isDetail = await window.refreshDetail();
+// --- Универсальный SPA-роутер и инициализация ---
+async function handleRouteChange() {
+  const isDetail = await refreshDetail();
   if (isDetail) {
-    safeInitDetailLikeView();
+    initDetailLikeView();
   } else {
     refreshListing();
   }
 }
 
-onSpaNavigation();
-window.addEventListener("locationchange", onSpaNavigation);
+document.addEventListener("DOMContentLoaded", () => {
+  handleRouteChange();
+});
+
+(function() {
+  const evt = new Event("locationchange");
+  const _push = history.pushState;
+  history.pushState = function() {
+    const ret = _push.apply(this, arguments);
+    window.dispatchEvent(evt);
+    return ret;
+  };
+  window.addEventListener("popstate", () => window.dispatchEvent(evt));
+})();
+
+window.addEventListener("locationchange", handleRouteChange);
