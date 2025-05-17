@@ -1,3 +1,87 @@
+// --- Глобальные функции для лайков (САМОЕ ВЕРХНЕЕ место файла) ---
+const LIKE_BLOCK_SELECTOR =
+  ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
+
+function initDetailLikeView() {
+  const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
+  if (!likeBlocks.length) return;
+
+  const viewCount = document.querySelector(".view-count");
+  if (!viewCount) return;
+
+  const m = location.pathname.toLowerCase().match(/^\/library\/([^\/]+?)\/?$/);
+  if (!m) return;
+  const cardId = m[1];
+
+  let adapter = window.adapter;
+  if (!adapter) {
+    if (window.supabaseInstance) {
+      adapter = new SupabaseAdapter(window.supabaseInstance);
+    } else {
+      adapter = new LocalAdapter();
+    }
+    window.adapter = adapter;
+  }
+
+  adapter.trackView(cardId).then((vc) => {
+    viewCount.textContent = vc;
+  });
+
+  likeBlocks.forEach((likeWrap) => {
+    const likeDigit = likeWrap.querySelector(
+      ".idea-content_card-tags-likes-text-digit"
+    );
+    if (!likeDigit) return;
+
+    adapter.loadLikes(cardId).then(({ count, userLiked }) => {
+      likeDigit.textContent = count;
+      likeWrap.classList.toggle("liked", userLiked);
+    });
+
+    function likeClickHandler(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (likeWrap.classList.contains("loading")) return;
+      likeWrap.classList.add("loading");
+      const was = likeWrap.classList.contains("liked");
+      let old = parseInt(likeDigit.textContent || "0", 10);
+      try {
+        likeWrap.classList.toggle("liked", !was);
+        likeDigit.textContent = was ? old - 1 : old + 1;
+        adapter
+          .toggleLike(cardId)
+          .then(({ count, userLiked }) => {
+            likeWrap.classList.toggle("liked", userLiked);
+            likeDigit.textContent = count;
+          })
+          .catch(() => {
+            likeWrap.classList.toggle("liked", was);
+            likeDigit.textContent = old;
+          })
+          .finally(() => {
+            likeWrap.classList.remove("loading");
+          });
+      } catch (err) {
+        likeWrap.classList.toggle("liked", was);
+        likeDigit.textContent = old;
+        likeWrap.classList.remove("loading");
+      }
+    }
+    likeWrap.removeEventListener("click", likeClickHandler);
+    likeWrap.addEventListener("click", likeClickHandler);
+  });
+}
+
+function safeInitDetailLikeView() {
+  const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
+  const viewCount = document.querySelector(".view-count");
+  if (!likeBlocks.length || !viewCount) {
+    setTimeout(safeInitDetailLikeView, 200);
+    return;
+  }
+  initDetailLikeView();
+}
+
 (function() {
   let adapter = null;
   const DEBUG = false;
@@ -435,87 +519,3 @@ async function onSpaNavigation() {
 
 onSpaNavigation();
 window.addEventListener("locationchange", onSpaNavigation);
-
-// --- Глобальные функции для лайков ---
-const LIKE_BLOCK_SELECTOR =
-  ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
-
-function initDetailLikeView() {
-  const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
-  if (!likeBlocks.length) return;
-
-  const viewCount = document.querySelector(".view-count");
-  if (!viewCount) return;
-
-  const m = location.pathname.toLowerCase().match(/^\/library\/([^\/]+?)\/?$/);
-  if (!m) return;
-  const cardId = m[1];
-
-  let adapter = window.adapter;
-  if (!adapter) {
-    if (window.supabaseInstance) {
-      adapter = new SupabaseAdapter(window.supabaseInstance);
-    } else {
-      adapter = new LocalAdapter();
-    }
-    window.adapter = adapter;
-  }
-
-  adapter.trackView(cardId).then((vc) => {
-    viewCount.textContent = vc;
-  });
-
-  likeBlocks.forEach((likeWrap) => {
-    const likeDigit = likeWrap.querySelector(
-      ".idea-content_card-tags-likes-text-digit"
-    );
-    if (!likeDigit) return;
-
-    adapter.loadLikes(cardId).then(({ count, userLiked }) => {
-      likeDigit.textContent = count;
-      likeWrap.classList.toggle("liked", userLiked);
-    });
-
-    function likeClickHandler(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (likeWrap.classList.contains("loading")) return;
-      likeWrap.classList.add("loading");
-      const was = likeWrap.classList.contains("liked");
-      let old = parseInt(likeDigit.textContent || "0", 10);
-      try {
-        likeWrap.classList.toggle("liked", !was);
-        likeDigit.textContent = was ? old - 1 : old + 1;
-        adapter
-          .toggleLike(cardId)
-          .then(({ count, userLiked }) => {
-            likeWrap.classList.toggle("liked", userLiked);
-            likeDigit.textContent = count;
-          })
-          .catch(() => {
-            likeWrap.classList.toggle("liked", was);
-            likeDigit.textContent = old;
-          })
-          .finally(() => {
-            likeWrap.classList.remove("loading");
-          });
-      } catch (err) {
-        likeWrap.classList.toggle("liked", was);
-        likeDigit.textContent = old;
-        likeWrap.classList.remove("loading");
-      }
-    }
-    likeWrap.removeEventListener("click", likeClickHandler);
-    likeWrap.addEventListener("click", likeClickHandler);
-  });
-}
-
-function safeInitDetailLikeView() {
-  const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
-  const viewCount = document.querySelector(".view-count");
-  if (!likeBlocks.length || !viewCount) {
-    setTimeout(safeInitDetailLikeView, 200);
-    return;
-  }
-  initDetailLikeView();
-}
