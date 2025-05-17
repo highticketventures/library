@@ -398,247 +398,32 @@
     setupMutationObservers(debouncedListRefresh);
   });
 
-  class SupabaseAdapter {
-    constructor(supabase) {
-      this.supabase = supabase;
-      try {
-        this._likesCache =
-          JSON.parse(localStorage.getItem("likes_cache")) || {};
-      } catch {
-        this._likesCache = {};
-      }
-    }
-    getUserId() {
-      let uid = localStorage.getItem("user_id");
-      if (!uid) {
-        uid =
-          "user_" +
-          Math.random()
-            .toString(36)
-            .substr(2, 9);
-        localStorage.setItem("user_id", uid);
-      }
-      return uid;
-    }
-    async trackView(cardId) {
-      console.log("trackView cardId:", cardId);
-      const key = "viewedCards";
-      let seen = {};
-      try {
-        seen = JSON.parse(localStorage.getItem(key) || "{}");
-      } catch {
-        localStorage.setItem(key, "{}");
-      }
-      if (seen[cardId]) {
-        const { data } = await this.supabase
-          .from("page_views")
-          .select("views")
-          .eq("card_id", cardId)
-          .single();
-        return data?.views || 0;
-      }
-      seen[cardId] = true;
-      localStorage.setItem(key, JSON.stringify(seen));
-      const { data, error } = await this.supabase
-        .from("page_views")
-        .select("views")
-        .eq("card_id", cardId)
-        .single();
-      const newCnt = !error && data ? data.views + 1 : 1;
-      const upsertRes = await this.supabase
-        .from("page_views")
-        .upsert({ card_id: cardId, views: newCnt }, { onConflict: "card_id" });
-
-      if (upsertRes.error) {
-        console.error("Ошибка upsert page_views:", upsertRes.error);
-      } else {
-        console.log("Upsert page_views OK:", upsertRes);
-      }
-      return newCnt;
-    }
-    async loadLikes(cardId) {
-      const userId = this.getUserId();
-      const res = await this.supabase
-        .from("card_likes")
-        .select("user_id", { count: "exact" })
-        .eq("card_id", cardId);
-      const count = res.count || 0;
-      const userLiked = (res.data || []).some((r) => r.user_id === userId);
-      this._likesCache[cardId] = { count, userLiked };
-      try {
-        localStorage.setItem("likes_cache", JSON.stringify(this._likesCache));
-      } catch {}
-      return { count, userLiked };
-    }
-    async loadAllStats() {
-      const userId = this.getUserId();
-      const [likeRes, viewRes] = await Promise.all([
-        this.supabase.from("card_likes").select("card_id,user_id"),
-        this.supabase.from("page_views").select("card_id,views"),
-      ]);
-      const likesMap = {},
-        userLikedMap = {},
-        viewsMap = {};
-      (likeRes.data || []).forEach((r) => {
-        likesMap[r.card_id] = (likesMap[r.card_id] || 0) + 1;
-        if (r.user_id === userId) userLikedMap[r.card_id] = true;
-      });
-      (viewRes.data || []).forEach((r) => {
-        viewsMap[r.card_id] = r.views;
-      });
-      return { likesMap, userLikedMap, viewsMap };
-    }
-    async loadStatsForList(cardIds = []) {
-      if (!cardIds.length)
-        return { likesMap: {}, userLikedMap: {}, viewsMap: {} };
-      const userId = this.getUserId();
-      const [likeRes, viewRes] = await Promise.all([
-        this.supabase
-          .from("card_likes")
-          .select("card_id,user_id")
-          .in("card_id", cardIds),
-        this.supabase
-          .from("page_views")
-          .select("card_id,views")
-          .in("card_id", cardIds),
-      ]);
-      const likesMap = {},
-        userLikedMap = {},
-        viewsMap = {};
-      (likeRes.data || []).forEach((r) => {
-        likesMap[r.card_id] = (likesMap[r.card_id] || 0) + 1;
-        if (r.user_id === userId) userLikedMap[r.card_id] = true;
-      });
-      (viewRes.data || []).forEach((r) => {
-        viewsMap[r.card_id] = r.views;
-      });
-      return { likesMap, userLikedMap, viewsMap };
-    }
-    async toggleLike(cardId) {
-      const userId = this.getUserId();
-      const { data, error } = await this.supabase.rpc("toggle_card_like", {
-        p_card_id: cardId,
-        p_user_id: userId,
-      });
-      if (error) throw error;
-      this._likesCache[cardId] = {
-        count: data.likes_count,
-        userLiked: data.user_liked,
-      };
-      try {
-        localStorage.setItem("likes_cache", JSON.stringify(this._likesCache));
-      } catch {}
-      return { count: data.likes_count, userLiked: data.user_liked };
-    }
-  }
-
-  class LocalAdapter {
-    constructor() {
-      this._likesKey = "card_likes";
-      this._viewsKey = "page_views";
-      this._seenKey = "viewedCards";
-    }
-    getUserId() {
-      let uid = localStorage.getItem("user_id");
-      if (!uid) {
-        uid =
-          "user_" +
-          Math.random()
-            .toString(36)
-            .substr(2, 9);
-        localStorage.setItem("user_id", uid);
-      }
-      return uid;
-    }
-    async trackView(cardId) {
-      let seen = {};
-      try {
-        seen = JSON.parse(localStorage.getItem(this._seenKey) || "{}");
-      } catch {
-        localStorage.setItem(this._seenKey, "{}");
-      }
-      if (seen[cardId]) {
-        const now = JSON.parse(localStorage.getItem(this._viewsKey) || "{}");
-        return now[cardId] || 0;
-      }
-      seen[cardId] = true;
-      localStorage.setItem(this._seenKey, JSON.stringify(seen));
-      const views = JSON.parse(localStorage.getItem(this._viewsKey) || "{}");
-      views[cardId] = (views[cardId] || 0) + 1;
-      localStorage.setItem(this._viewsKey, JSON.stringify(views));
-      return views[cardId];
-    }
-    async loadLikes(cardId) {
-      const likes = JSON.parse(localStorage.getItem(this._likesKey) || "{}");
-      const uid = this.getUserId();
-      const arr = likes[cardId] || [];
-      return { count: arr.length, userLiked: arr.includes(uid) };
-    }
-    async loadAllStats() {
-      const likes = JSON.parse(localStorage.getItem(this._likesKey) || "{}");
-      const views = JSON.parse(localStorage.getItem(this._viewsKey) || "{}");
-      const uid = this.getUserId();
-      const likesMap = {},
-        userLikedMap = {},
-        viewsMap = {};
-      Object.entries(likes).forEach(([cid, arr]) => {
-        likesMap[cid] = arr.length;
-        if (arr.includes(uid)) userLikedMap[cid] = true;
-      });
-      Object.assign(viewsMap, views);
-      return { likesMap, userLikedMap, viewsMap };
-    }
-    async loadStatsForList(cardIds = []) {
-      const likesMap = {},
-        userLikedMap = {},
-        viewsMap = {};
-      const likes = JSON.parse(localStorage.getItem(this._likesKey) || "{}");
-      const views = JSON.parse(localStorage.getItem(this._viewsKey) || "{}");
-      const uid = this.getUserId();
-      cardIds.forEach((cid) => {
-        const arr = likes[cid] || [];
-        likesMap[cid] = arr.length;
-        if (arr.includes(uid)) userLikedMap[cid] = true;
-        viewsMap[cid] = views[cid] || 0;
-      });
-      return { likesMap, userLikedMap, viewsMap };
-    }
-    async toggleLike(cardId) {
-      const likes = JSON.parse(localStorage.getItem(this._likesKey) || "{}");
-      const uid = this.getUserId();
-      const arr = likes[cardId] || [];
-      const idx = arr.indexOf(uid);
-      if (idx >= 0) arr.splice(idx, 1);
-      else arr.push(uid);
-      likes[cardId] = arr;
-      localStorage.setItem(this._likesKey, JSON.stringify(likes));
-      return { count: arr.length, userLiked: arr.includes(uid) };
-    }
-  }
-
   window.sortItems = sortItems;
   window.setupCustomSort = setupCustomSort;
   window.refreshListing = refreshListing;
-
+  window.refreshDetail = refreshDetail;
   window.SupabaseAdapter = SupabaseAdapter;
   window.LocalAdapter = LocalAdapter;
 })();
 
+// --- Универсальный SPA-роутер через History API ---
 (function() {
+  // Перехват pushState
   const origPush = history.pushState;
   history.pushState = function() {
     const ret = origPush.apply(this, arguments);
     window.dispatchEvent(new Event("locationchange"));
     return ret;
   };
-
+  // Перехват back/forward
   window.addEventListener("popstate", () =>
     window.dispatchEvent(new Event("locationchange"))
   );
 })();
 
+// На каждое изменение URL в SPA
 async function onSpaNavigation() {
-  const isDetail = await refreshDetail();
+  const isDetail = await window.refreshDetail();
   if (isDetail) {
     safeInitDetailLikeView();
   } else {
@@ -647,7 +432,6 @@ async function onSpaNavigation() {
 }
 
 onSpaNavigation();
-
 window.addEventListener("locationchange", onSpaNavigation);
 
 const LIKE_BLOCK_SELECTOR =
