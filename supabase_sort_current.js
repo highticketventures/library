@@ -169,6 +169,7 @@
 
   // === НАВЕШИВАЕМ CLICK-ХЕНДЛЕРЫ НА ДЕТАЛЬНОЙ СТРАНИЦЕ ===
   function initDetailLikeView() {
+    console.log("initDetailLikeView CALLED");
     const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
     const viewCount = document.querySelector(".view-count");
     if (!likeBlocks.length || !viewCount) return;
