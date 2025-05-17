@@ -1,10 +1,14 @@
 (function() {
+  // === КОНСТАНТЫ И ПЕРЕМЕННЫЕ ===
+  const LIKE_BLOCK_SELECTOR =
+    ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
   let adapter = null;
   const DEBUG = false;
   let currentSortMode = "recent-desc";
 
   window._debug_adapter = () => adapter;
 
+  // === ВСПОМОГАТЕЛИ ===
   function debug(...args) {
     if (DEBUG) console.log("[card-stats]", ...args);
   }
@@ -24,90 +28,75 @@
   }
 
   function createAdapter() {
-    if (window.supabaseInstance) {
-      return new SupabaseAdapter(window.supabaseInstance);
-    }
-    return new LocalAdapter();
+    return window.supabaseInstance
+      ? new SupabaseAdapter(window.supabaseInstance)
+      : new LocalAdapter();
   }
 
+  // === ЛАЙКИ НА СПИСКЕ КАРТОЧЕК ===
   async function initLikeButtons() {
     if (!adapter) adapter = createAdapter();
-    document
-      .querySelectorAll(
-        ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile"
-      )
-      .forEach((wrapper) => {
-        if (wrapper.dataset.likeInit) return;
-        wrapper.dataset.likeInit = "1";
-        const href =
-          wrapper.closest(".w-dyn-item")?.querySelector('a[href*="/library/"]')
-            ?.href || "";
-        const cardId = href.split("/library/")[1] || "";
-        if (!cardId) return;
-        wrapper.dataset.cardId = cardId;
+    document.querySelectorAll(LIKE_BLOCK_SELECTOR).forEach((wrapper) => {
+      if (wrapper.dataset.likeInit) return;
+      wrapper.dataset.likeInit = "1";
 
-        wrapper.addEventListener("click", async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (wrapper.classList.contains("loading")) return;
+      const href =
+        wrapper.closest(".w-dyn-item")?.querySelector('a[href*="/library/"]')
+          ?.href || "";
+      const cardId = href.split("/library/")[1] || "";
+      if (!cardId) return;
+      wrapper.dataset.cardId = cardId;
 
-          const txtEl = wrapper.querySelector(
-            ".idea-content_card-tags-likes-text-digit"
-          );
-          const old = parseInt(txtEl?.textContent || "0", 10);
-          const was = wrapper.classList.contains("liked");
-          wrapper.classList.add("loading");
+      wrapper.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (wrapper.classList.contains("loading")) return;
+        wrapper.classList.add("loading");
 
-          try {
-            wrapper.classList.toggle("liked", !was);
-            safeSetText(txtEl, was ? old - 1 : old + 1);
+        const txtEl = wrapper.querySelector(
+          ".idea-content_card-tags-likes-text-digit"
+        );
+        const old = parseInt(txtEl?.textContent || "0", 10);
+        const was = wrapper.classList.contains("liked");
 
-            const { count, userLiked } = await adapter.toggleLike(cardId);
+        try {
+          // оптимистично обновляем UI
+          wrapper.classList.toggle("liked", !was);
+          safeSetText(txtEl, was ? old - 1 : old + 1);
 
-            wrapper.classList.toggle("liked", userLiked);
-            safeSetText(txtEl, count);
+          const { count, userLiked } = await adapter.toggleLike(cardId);
 
-            if (currentSortMode.startsWith("popular-")) {
-              const list = document.querySelector(
-                '[fs-cmssort-element="list"]'
-              );
-              if (list) sortItems(list, currentSortMode);
-            }
-          } catch (err) {
-            debug("toggleLike failed:", err);
-            wrapper.classList.toggle("liked", was);
-            safeSetText(txtEl, old);
-          } finally {
-            wrapper.classList.remove("loading");
+          wrapper.classList.toggle("liked", userLiked);
+          safeSetText(txtEl, count);
+
+          // если сейчас сортировка по популярности — обновляем порядок
+          if (currentSortMode.startsWith("popular-")) {
+            const list = document.querySelector('[fs-cmssort-element="list"]');
+            if (list) sortItems(list, currentSortMode);
           }
-        });
+        } catch (err) {
+          debug("toggleLike failed:", err);
+          // откатываем
+          wrapper.classList.toggle("liked", was);
+          safeSetText(txtEl, old);
+        } finally {
+          wrapper.classList.remove("loading");
+        }
       });
+    });
   }
 
+  // === ОБНОВЛЕНИЕ СПИСКА КАРТОЧЕК ===
   async function refreshListing() {
     if (!adapter) adapter = createAdapter();
 
     const items = Array.from(document.querySelectorAll(".w-dyn-item"));
-    console.log("[Like] refreshListing: найдено .w-dyn-item:", items.length);
-    items.forEach((item, idx) => {
-      const mobileLike = item.querySelector(
-        ".idea-content_card-tags-likes-wrapper-mobile"
-      );
-      if (mobileLike) {
-        console.log(
-          `[Like] В item #${idx} найден мобильный лайк-блок`,
-          mobileLike
-        );
-      } else {
-        console.warn(`[Like] В item #${idx} мобильный лайк-блок НЕ найден`);
-      }
-    });
     const ids = Array.from(
       new Set(
         items
           .map(
-            (it) =>
-              it
+            (item) =>
+              item
                 .querySelector('a[href*="/library/"]')
                 ?.href.split("/library/")[1] || ""
           )
@@ -123,44 +112,31 @@
       debug("partial stats failed, fallback to full:", err);
       stats = await adapter.loadAllStats();
     }
-
     const { likesMap, userLikedMap, viewsMap } = stats;
 
     items.forEach((item) => {
       const href = item.querySelector('a[href*="/library/"]')?.href || "";
       const id = href.split("/library/")[1] || "";
 
-      const vEl = item.querySelector(".view-count");
-      safeSetText(vEl, viewsMap[id] || 0);
+      // просмотры
+      safeSetText(item.querySelector(".view-count"), viewsMap[id] || 0);
 
-      // Обновляем оба лайк-блока (десктоп и мобилка)
-      [
-        ".idea-content_card-tags-likes-wrapper",
-        ".idea-content_card-tags-likes-wrapper-mobile",
-      ].forEach((selector) => {
-        item.querySelectorAll(selector).forEach((wrap) => {
-          // Только для реально видимых блоков
-          if (
-            wrap.offsetParent !== null &&
-            window.getComputedStyle(wrap).display !== "none"
-          ) {
-            wrap.classList.toggle("liked", !!userLikedMap[id]);
-            const txt = wrap.querySelector(
-              ".idea-content_card-tags-likes-text-digit"
-            );
-            safeSetText(txt, likesMap[id] || 0);
-          }
-        });
+      // лайки
+      item.querySelectorAll(LIKE_BLOCK_SELECTOR).forEach((wrap) => {
+        wrap.classList.toggle("liked", !!userLikedMap[id]);
+        safeSetText(
+          wrap.querySelector(".idea-content_card-tags-likes-text-digit"),
+          likesMap[id] || 0
+        );
       });
     });
 
     initLikeButtons();
-
     waitForListAndSort(currentSortMode);
-
     document.dispatchEvent(new CustomEvent("fs-cmssort:load"));
   }
 
+  // === ОБНОВЛЕНИЕ ДЕТАЛЬНОЙ СТРАНИЦЫ ===
   async function refreshDetail() {
     if (!adapter) adapter = createAdapter();
 
@@ -168,29 +144,88 @@
       .toLowerCase()
       .match(/^\/library\/([^\/]+?)\/?$/);
     if (!m) return false;
-
     const cardId = m[1];
+
+    // просмотры
     const vc = await adapter.trackView(cardId);
     document
       .querySelectorAll(".view-count")
       .forEach((el) => safeSetText(el, vc));
 
+    // лайки
     const { count, userLiked } = await adapter.loadLikes(cardId);
-    [
-      `.idea-content_card-tags-likes-wrapper[data-card-id="${cardId}"]`,
-      `.idea-content_card-tags-likes-wrapper-mobile[data-card-id="${cardId}"]`,
-    ].forEach((selector) => {
-      document.querySelectorAll(selector).forEach((wrap) => {
+    document
+      .querySelectorAll(`${LIKE_BLOCK_SELECTOR}[data-card-id="${cardId}"]`)
+      .forEach((wrap) => {
         wrap.classList.toggle("liked", userLiked);
-        const txt = wrap.querySelector(
-          ".idea-content_card-tags-likes-text-digit"
+        safeSetText(
+          wrap.querySelector(".idea-content_card-tags-likes-text-digit"),
+          count
         );
-        safeSetText(txt, count);
       });
-    });
+
     return true;
   }
 
+  // === НАВЕШИВАЕМ CLICK-ХЕНДЛЕРЫ НА ДЕТАЛЬНОЙ СТРАНИЦЕ ===
+  function initDetailLikeView() {
+    const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
+    const viewCount = document.querySelector(".view-count");
+    if (!likeBlocks.length || !viewCount) return;
+
+    const m = location.pathname
+      .toLowerCase()
+      .match(/^\/library\/([^\/]+?)\/?$/);
+    if (!m) return;
+    const cardId = m[1];
+
+    if (!adapter) adapter = createAdapter();
+
+    // показываем просмотры (опционально обновляет ещё раз)
+    adapter.trackView(cardId).then((vc) => {
+      viewCount.textContent = vc;
+    });
+
+    likeBlocks.forEach((wrap) => {
+      const digit = wrap.querySelector(
+        ".idea-content_card-tags-likes-text-digit"
+      );
+      if (!digit) return;
+
+      // показываем лайки
+      adapter.loadLikes(cardId).then(({ count, userLiked }) => {
+        digit.textContent = count;
+        wrap.classList.toggle("liked", userLiked);
+      });
+
+      // если ещё не повесили клик
+      if (!wrap.dataset.detailLikeInit) {
+        wrap.dataset.detailLikeInit = "1";
+        wrap.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (wrap.classList.contains("loading")) return;
+          wrap.classList.add("loading");
+          const was = wrap.classList.contains("liked");
+          const old = parseInt(digit.textContent || "0", 10);
+          try {
+            wrap.classList.toggle("liked", !was);
+            digit.textContent = was ? old - 1 : old + 1;
+            const { count, userLiked } = await adapter.toggleLike(cardId);
+            wrap.classList.toggle("liked", userLiked);
+            digit.textContent = count;
+          } catch (err) {
+            wrap.classList.toggle("liked", was);
+            digit.textContent = old;
+          } finally {
+            wrap.classList.remove("loading");
+          }
+        });
+      }
+    });
+  }
+
+  // === СОРТИРОВКА ===
   function setupCustomSort() {
     const triggerContainer = document.querySelector(
       '[fs-cmssort-element="trigger"]'
@@ -212,10 +247,8 @@
       trigger.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
-
         const sf = trigger.getAttribute("fs-cmssort-field");
         if (!sf) return;
-
         currentSortMode = sf;
         waitForListAndSort(sf);
 
@@ -223,11 +256,10 @@
           '[fs-cmssort-element="dropdown-label"]'
         );
         if (label) {
-          const linkText =
-            trigger.querySelector("div")?.textContent || trigger.textContent;
-          label.textContent = linkText.trim();
+          label.textContent = (
+            trigger.querySelector("div")?.textContent || trigger.textContent
+          ).trim();
         }
-
         sortTriggers.forEach((el) =>
           el.classList.toggle("w--current", el === trigger)
         );
@@ -238,7 +270,6 @@
   function sortItems(container, sortMode) {
     const items = Array.from(container.querySelectorAll(".w-dyn-item"));
     if (!items.length) return;
-
     const [field, order = "desc"] = sortMode.split("-");
 
     function toSortableDate(str) {
@@ -256,7 +287,7 @@
         November: "11",
         December: "12",
       };
-      const m = str.match(/^([A-Za-z]+) (\d{1,2}), (\d{4})$/);
+      const m = str.match(/^([A-Za-z]+) (\\d{1,2}), (\\d{4})$/);
       if (!m) return "";
       return `${m[3]}-${months[m[1]]}-${m[2].padStart(2, "0")}`;
     }
@@ -277,21 +308,19 @@
         );
       }
       if (field === "recent") {
-        const dateStr =
-          item.querySelector('[fs-cmssort-field="recent"]')?.textContent || "";
-        return toSortableDate(dateStr);
+        return;
+        toSortableDate(
+          item.querySelector('[fs-cmssort-field="recent"]')?.textContent || ""
+        );
       }
       return 0;
     }
 
-    // Получаем порядок id до сортировки
-    const prevOrder = Array.from(container.children)
-      .filter((el) => el.classList.contains("w-dyn-item"))
+    const prevOrder = items
       .map(
-        (el) =>
-          el
-            .querySelector('a[href*="/library/"]')
-            ?.href.split("/library/")[1] || ""
+        (i) =>
+          i.querySelector('a[href*="/library/"]')?.href.split("/library/")[1] ||
+          ""
       )
       .join(",");
 
@@ -304,26 +333,31 @@
       return order === "asc" ? va - vb : vb - va;
     });
 
-    // Получаем порядок id после сортировки
     const newOrder = items
       .map(
-        (el) =>
-          el
-            .querySelector('a[href*="/library/"]')
-            ?.href.split("/library/")[1] || ""
+        (i) =>
+          i.querySelector('a[href*="/library/"]')?.href.split("/library/")[1] ||
+          ""
       )
       .join(",");
 
-    if (prevOrder === newOrder) return; // Если порядок не изменился — не обновляем DOM
-
+    if (prevOrder === newOrder) return;
     items.forEach((i) => container.appendChild(i));
     document.dispatchEvent(
-      new CustomEvent("custom-sort:sorted", {
-        detail: { sortMode },
-      })
+      new CustomEvent("custom-sort:sorted", { detail: { sortMode } })
     );
   }
 
+  function waitForListAndSort(sortMode) {
+    const tryFind = () => {
+      const list = document.querySelector('[fs-cmssort-element="list"]');
+      if (list) sortItems(list, sortMode);
+      else setTimeout(tryFind, 100);
+    };
+    tryFind();
+  }
+
+  // === ПЕРИОДИЧЕСКИЕ ОБНОВЛЕНИЯ, ЛИСТЕНЕРЫ И ОБСЕРВЕРЫ ===
   function setupPeriodicUpdates(debouncedRefresh) {
     window._cardStatsInterval = setInterval(() => {
       const isDetail = !!location.pathname
@@ -342,6 +376,7 @@
     ].forEach((name) =>
       document.addEventListener(name, () => debouncedRefresh())
     );
+
     document.addEventListener("click", (e) => {
       if (
         e.target.closest(".w-pagination-next") ||
@@ -352,6 +387,7 @@
         debouncedRefresh();
       }
     });
+
     let lastUrl = location.href;
     setInterval(() => {
       if (location.href !== lastUrl) {
@@ -390,54 +426,7 @@
     }
   }
 
-  function waitForListAndSort(sortMode) {
-    const tryFind = () => {
-      const list = document.querySelector('[fs-cmssort-element="list"]');
-      if (list) {
-        sortItems(list, sortMode);
-      } else {
-        setTimeout(tryFind, 100);
-      }
-    };
-    tryFind();
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    if (/^\/library\/[^\/]+\/?$/.test(location.pathname.toLowerCase())) {
-      if (typeof window.initDetailLikeView === "function") {
-        window.initDetailLikeView();
-      }
-    }
-    const debouncedListRefresh = debounce(refreshListing, 300);
-    (async function initPage() {
-      const isDetail = await refreshDetail();
-      if (!isDetail) refreshListing();
-      setupCustomSort();
-    })();
-    setupPeriodicUpdates(debouncedListRefresh);
-    setupEventListeners(debouncedListRefresh);
-    setupMutationObservers(debouncedListRefresh);
-
-    const dynList =
-      document.querySelector(".w-dyn-list") ||
-      document.querySelector(".w-dyn-items");
-    if (dynList) {
-      new MutationObserver((mutationsList) => {
-        const addedMobileLikes = mutationsList.some((mutation) =>
-          Array.from(mutation.addedNodes).some(
-            (node) =>
-              node.nodeType === 1 &&
-              node.querySelector &&
-              node.querySelector(".idea-content_card-tags-likes-wrapper-mobile")
-          )
-        );
-        if (addedMobileLikes) {
-          window.refreshListing();
-        }
-      }).observe(dynList, { childList: true, subtree: true });
-    }
-  });
-
+  // === АДАПТЕРЫ ===
   class SupabaseAdapter {
     constructor(supabase) {
       this.supabase = supabase;
@@ -461,7 +450,6 @@
       return uid;
     }
     async trackView(cardId) {
-      console.log("trackView cardId:", cardId);
       const key = "viewedCards";
       let seen = {};
       try {
@@ -485,15 +473,12 @@
         .eq("card_id", cardId)
         .single();
       const newCnt = !error && data ? data.views + 1 : 1;
-      const upsertRes = await this.supabase
-        .from("page_views")
-        .upsert({ card_id: cardId, views: newCnt }, { onConflict: "card_id" });
-
-      if (upsertRes.error) {
-        console.error("Ошибка upsert page_views:", upsertRes.error);
-      } else {
-        console.log("Upsert page_views OK:", upsertRes);
-      }
+      await this.supabase.from("page_views").upsert(
+        { card_id: cardId, views: newCnt },
+        {
+          onConflict: "card_id",
+        }
+      );
       return newCnt;
     }
     async loadLikes(cardId) {
@@ -656,158 +641,41 @@
     }
   }
 
-  // --- Экспортируем классы в window ---
-  window.SupabaseAdapter = SupabaseAdapter;
-  window.LocalAdapter = LocalAdapter;
-
-  window.sortItems = sortItems;
-  window.setupCustomSort = setupCustomSort;
-  window.refreshListing = refreshListing;
-})();
-// test change
-document.addEventListener("DOMContentLoaded", () => {
-  const debouncedListRefresh = debounce(refreshListing, 300);
-  window.SupabaseAPI.onReady(async () => {
+  // === ОБЩИЙ РОУТЕР ===
+  async function handleRouteChange() {
     const isDetail = await refreshDetail();
-    if (!isDetail) refreshListing();
+    if (isDetail) initDetailLikeView();
+    else refreshListing();
+  }
+
+  // Перехват History API
+  (function() {
+    const evt = new Event("locationchange");
+    const orig = history.pushState;
+    history.pushState = function() {
+      const ret = orig.apply(this, arguments);
+      window.dispatchEvent(evt);
+      return ret;
+    };
+    window.addEventListener("popstate", () => window.dispatchEvent(evt));
+    window.addEventListener("locationchange", handleRouteChange);
+  })();
+
+  // Первая инициализация
+  document.addEventListener("DOMContentLoaded", async () => {
+    const debouncedListRefresh = debounce(refreshListing, 300);
+    await handleRouteChange();
     setupCustomSort();
     setupPeriodicUpdates(debouncedListRefresh);
     setupEventListeners(debouncedListRefresh);
     setupMutationObservers(debouncedListRefresh);
   });
-});
 
-// --- Инициализация лайков и просмотров на детальной странице (универсально для десктопа и мобилки) ---
-function initDetailLikeView() {
-  const likeWraps = [
-    ...document.querySelectorAll(
-      ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile"
-    ),
-  ];
-  const viewCount = document.querySelector(".view-count");
-  if (!likeWraps.length || !viewCount) {
-    console.warn(
-      "[Like] Не найдено ни одного лайк-блока на детальной странице"
-    );
-    return;
-  }
-
-  const m = location.pathname.toLowerCase().match(/^\/library\/([^\/]+?)\/?$/);
-  if (!m) return;
-  const cardId = m[1];
-
-  // Явно проставляем data-card-id для всех лайк-блоков
-  likeWraps.forEach((likeWrap) => {
-    likeWrap.dataset.cardId = cardId;
-    if (
-      likeWrap.classList.contains("idea-content_card-tags-likes-wrapper-mobile")
-    ) {
-      console.log("[Like] Найден мобильный лайк-блок", likeWrap);
-    }
-  });
-
-  // Получаем адаптер (используем уже существующий)
-  let adapter = window.adapter;
-  if (!adapter) {
-    if (window.supabaseInstance) {
-      adapter = new SupabaseAdapter(window.supabaseInstance);
-    } else {
-      adapter = new LocalAdapter();
-    }
-    window.adapter = adapter;
-  }
-
-  // Получаем и отображаем просмотры
-  adapter.trackView(cardId).then((vc) => {
-    viewCount.textContent = vc;
-  });
-
-  // Получаем и отображаем лайки для каждого блока
-  adapter.loadLikes(cardId).then(({ count, userLiked }) => {
-    likeWraps.forEach((likeWrap) => {
-      const likeDigit = likeWrap.querySelector(
-        ".idea-content_card-tags-likes-text-digit"
-      );
-      if (likeDigit) likeDigit.textContent = count;
-      likeWrap.classList.toggle("liked", userLiked);
-    });
-  });
-
-  // Навешиваем обработчик лайка (если не навешен)
-  likeWraps.forEach((likeWrap) => {
-    if (!likeWrap.dataset.detailLikeInit) {
-      likeWrap.dataset.detailLikeInit = "1";
-      likeWrap.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (likeWrap.classList.contains("loading")) return;
-        likeWrap.classList.add("loading");
-        const likeDigit = likeWrap.querySelector(
-          ".idea-content_card-tags-likes-text-digit"
-        );
-        const was = likeWrap.classList.contains("liked");
-        let old = parseInt(likeDigit?.textContent || "0", 10);
-        try {
-          likeWrap.classList.toggle("liked", !was);
-          if (likeDigit) likeDigit.textContent = was ? old - 1 : old + 1;
-          const { count, userLiked } = await adapter.toggleLike(cardId);
-          likeWrap.classList.toggle("liked", userLiked);
-          if (likeDigit) likeDigit.textContent = count;
-        } catch (err) {
-          likeWrap.classList.toggle("liked", was);
-          if (likeDigit) likeDigit.textContent = old;
-        } finally {
-          likeWrap.classList.remove("loading");
-        }
-      });
-      if (
-        likeWrap.classList.contains(
-          "idea-content_card-tags-likes-wrapper-mobile"
-        )
-      ) {
-        console.log(
-          "[Like] Навешан обработчик на мобильный лайк-блок",
-          likeWrap
-        );
-      }
-    }
-  });
-}
-
-// --- Универсальный SPA-роутер для Webflow ---
-function runSpaRouter() {
-  const isDetail = /^\/library\/[^\/]+\/?$/.test(
-    location.pathname.toLowerCase()
-  );
-  if (isDetail) {
-    if (typeof window.refreshDetail === "function") {
-      window.refreshDetail();
-    }
-    if (typeof window.initDetailLikeView === "function") {
-      window.initDetailLikeView();
-    }
-  } else {
-    if (typeof window.refreshListing === "function") {
-      window.refreshListing();
-    }
-  }
-}
-
-// --- Патчим History API и слушаем popstate ---
-(function() {
-  const origPush = history.pushState;
-  const origReplace = history.replaceState;
-  history.pushState = function() {
-    origPush.apply(this, arguments);
-    setTimeout(runSpaRouter, 0);
-  };
-  history.replaceState = function() {
-    origReplace.apply(this, arguments);
-    setTimeout(runSpaRouter, 0);
-  };
-  window.addEventListener("popstate", () => setTimeout(runSpaRouter, 0));
+  // Экспорт для консоли/доп. вызовов
+  window.refreshListing = refreshListing;
+  window.refreshDetail = refreshDetail;
+  window.initLikeButtons = initLikeButtons;
+  window.initDetailLikeView = initDetailLikeView;
+  window.SupabaseAdapter = SupabaseAdapter;
+  window.LocalAdapter = LocalAdapter;
 })();
-
-// --- Экспортируем функции в window ---
-window.refreshDetail = refreshDetail;
-window.initDetailLikeView = initDetailLikeView;
