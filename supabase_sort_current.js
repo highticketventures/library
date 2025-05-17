@@ -120,7 +120,9 @@
       const id = href.split("/library/")[1] || "";
 
       // просмотры
-      safeSetText(item.querySelector(".view-count"), viewsMap[id] || 0);
+      item
+        .querySelectorAll(".view-count")
+        .forEach((el) => safeSetText(el, viewsMap[id] || 0));
 
       // лайки
       item.querySelectorAll(LIKE_BLOCK_SELECTOR).forEach((wrap) => {
@@ -348,7 +350,6 @@
       )
       .join(",");
 
-    if (prevOrder === newOrder) return;
     items.forEach((i) => container.appendChild(i));
     document.dispatchEvent(
       new CustomEvent("custom-sort:sorted", { detail: { sortMode } })
