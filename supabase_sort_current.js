@@ -666,8 +666,26 @@
     window.addEventListener("locationchange", handleRouteChange);
   })();
 
+  function waitForDetailLikeBlocksAndInit() {
+    if (!/^\/library\/[^\/]+\/?$/.test(location.pathname.toLowerCase())) return;
+    const observer = new MutationObserver(() => {
+      const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
+      if (likeBlocks.length) {
+        observer.disconnect();
+        initDetailLikeView();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    // На случай если лайк-блоки уже есть
+    if (document.querySelectorAll(LIKE_BLOCK_SELECTOR).length) {
+      observer.disconnect();
+      initDetailLikeView();
+    }
+  }
+
   // Первая инициализация
   document.addEventListener("DOMContentLoaded", async () => {
+    waitForDetailLikeBlocksAndInit();
     const debouncedListRefresh = debounce(refreshListing, 300);
     await handleRouteChange();
     setupCustomSort();
