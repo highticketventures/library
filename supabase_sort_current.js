@@ -1,7 +1,3 @@
-// --- Глобальные функции для лайков (САМОЕ ВЕРХНЕЕ место файла) ---
-const LIKE_BLOCK_SELECTOR =
-  ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile";
-
 (function() {
   let adapter = null;
   const DEBUG = false;
@@ -34,153 +30,138 @@ const LIKE_BLOCK_SELECTOR =
     return new LocalAdapter();
   }
 
-  function initLikeButtons() {
+  async function initLikeButtons() {
     if (!adapter) adapter = createAdapter();
-    document.querySelectorAll(LIKE_BLOCK_SELECTOR).forEach((wrapper) => {
-      if (wrapper.dataset.likeInit) return;
-      wrapper.dataset.likeInit = "1";
-      const href =
-        wrapper.closest(".w-dyn-item")?.querySelector('a[href*="/library/"]')
-          ?.href || "";
-      const cardId = href.split("/library/")[1] || "";
-      if (!cardId) return;
-      wrapper.dataset.cardId = cardId;
+    document
+      .querySelectorAll(
+        ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile"
+      )
+      .forEach((wrapper) => {
+        if (wrapper.dataset.likeInit) return;
+        wrapper.dataset.likeInit = "1";
+        const href =
+          wrapper.closest(".w-dyn-item")?.querySelector('a[href*="/library/"]')
+            ?.href || "";
+        const cardId = href.split("/library/")[1] || "";
+        if (!cardId) return;
+        wrapper.dataset.cardId = cardId;
 
-      wrapper.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (wrapper.classList.contains("loading")) return;
-        wrapper.classList.add("loading");
-        const digitEl = wrapper.querySelector(
-          ".idea-content_card-tags-likes-text-digit"
-        );
-        const old = parseInt(digitEl?.textContent || "0", 10);
-        const was = wrapper.classList.contains("liked");
-        wrapper.classList.toggle("liked", !was);
-        safeSetText(digitEl, was ? old - 1 : old + 1);
-        try {
-          const { count, userLiked } = await adapter.toggleLike(cardId);
-          wrapper.classList.toggle("liked", userLiked);
-          safeSetText(digitEl, count);
-        } catch (err) {
-          debug("toggleLike failed:", err);
-          wrapper.classList.toggle("liked", was);
-          safeSetText(digitEl, old);
-        } finally {
-          wrapper.classList.remove("loading");
-        }
+        wrapper.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (wrapper.classList.contains("loading")) return;
+
+          const txtEl = wrapper.querySelector(
+            ".idea-content_card-tags-likes-text-digit"
+          );
+          const old = parseInt(txtEl?.textContent || "0", 10);
+          const was = wrapper.classList.contains("liked");
+          wrapper.classList.add("loading");
+
+          try {
+            wrapper.classList.toggle("liked", !was);
+            safeSetText(txtEl, was ? old - 1 : old + 1);
+
+            const { count, userLiked } = await adapter.toggleLike(cardId);
+
+            wrapper.classList.toggle("liked", userLiked);
+            safeSetText(txtEl, count);
+
+            if (currentSortMode.startsWith("popular-")) {
+              const list = document.querySelector(
+                '[fs-cmssort-element="list"]'
+              );
+              if (list) sortItems(list, currentSortMode);
+            }
+          } catch (err) {
+            debug("toggleLike failed:", err);
+            wrapper.classList.toggle("liked", was);
+            safeSetText(txtEl, old);
+          } finally {
+            wrapper.classList.remove("loading");
+          }
+        });
       });
-    });
   }
 
   async function refreshListing() {
     if (!adapter) adapter = createAdapter();
+
     const items = Array.from(document.querySelectorAll(".w-dyn-item"));
     const ids = Array.from(
       new Set(
         items
           .map(
-            (i) =>
-              i
+            (it) =>
+              it
                 .querySelector('a[href*="/library/"]')
-                ?.href.split("/library/")[1]
+                ?.href.split("/library/")[1] || ""
           )
           .filter(Boolean)
       )
     );
     if (!ids.length) return;
+
     let stats;
     try {
       stats = await adapter.loadStatsForList(ids);
-    } catch (e) {
-      debug("loadStatsForList failed:", e);
+    } catch (err) {
+      debug("partial stats failed, fallback to full:", err);
       stats = await adapter.loadAllStats();
     }
+
     const { likesMap, userLikedMap, viewsMap } = stats;
+
     items.forEach((item) => {
-      const id =
-        item
-          .querySelector('a[href*="/library/"]')
-          ?.href.split("/library/")[1] || "";
-      safeSetText(item.querySelector(".view-count"), viewsMap[id] || 0);
-      item.querySelectorAll(LIKE_BLOCK_SELECTOR).forEach((w) => {
-        w.classList.toggle("liked", !!userLikedMap[id]);
-        safeSetText(
-          w.querySelector(".idea-content_card-tags-likes-text-digit"),
-          likesMap[id] || 0
+      const href = item.querySelector('a[href*="/library/"]')?.href || "";
+      const id = href.split("/library/")[1] || "";
+
+      const vEl = item.querySelector(".view-count");
+      safeSetText(vEl, viewsMap[id] || 0);
+
+      const wrap = item.querySelector(".idea-content_card-tags-likes-wrapper");
+      if (wrap) {
+        wrap.classList.toggle("liked", !!userLikedMap[id]);
+        const txt = wrap.querySelector(
+          ".idea-content_card-tags-likes-text-digit"
         );
-      });
+        safeSetText(txt, likesMap[id] || 0);
+      }
     });
+
     initLikeButtons();
+
     waitForListAndSort(currentSortMode);
+
     document.dispatchEvent(new CustomEvent("fs-cmssort:load"));
   }
 
   async function refreshDetail() {
     if (!adapter) adapter = createAdapter();
+
     const m = location.pathname
       .toLowerCase()
       .match(/^\/library\/([^\/]+?)\/?$/);
     if (!m) return false;
+
     const cardId = m[1];
     const vc = await adapter.trackView(cardId);
     document
       .querySelectorAll(".view-count")
       .forEach((el) => safeSetText(el, vc));
-    const { count, userLiked } = await adapter.loadLikes(cardId);
-    document
-      .querySelectorAll(
-        `[data-card-id="${cardId}"]${
-          LIKE_BLOCK_SELECTOR.includes("mobile")
-            ? "," + LIKE_BLOCK_SELECTOR + "[data-card-id='" + cardId + "']"
-            : ""
-        }`
-      )
-      .forEach((w) => {
-        w.classList.toggle("liked", userLiked);
-        safeSetText(
-          w.querySelector(".idea-content_card-tags-likes-text-digit"),
-          count
-        );
-      });
-    return true;
-  }
 
-  function initDetailLikeView() {
-    const likeBlocks = document.querySelectorAll(LIKE_BLOCK_SELECTOR);
-    if (!likeBlocks.length) return;
-    const m = location.pathname
-      .toLowerCase()
-      .match(/^\/library\/([^\/]+?)\/?$/);
-    if (!m) return;
-    const cardId = m[1];
-    likeBlocks.forEach((likeWrap) => {
-      if (likeWrap.dataset.cardId !== cardId) return;
-      const likeDigit = likeWrap.querySelector(
+    const { count, userLiked } = await adapter.loadLikes(cardId);
+    const wrap = document.querySelector(
+      `.idea-content_card-tags-likes-wrapper[data-card-id="${cardId}"]`
+    );
+    if (wrap) {
+      wrap.classList.toggle("liked", userLiked);
+      const txt = wrap.querySelector(
         ".idea-content_card-tags-likes-text-digit"
       );
-      if (!likeDigit) return;
-      likeWrap.addEventListener("click", async function likeClickHandler(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (likeWrap.classList.contains("loading")) return;
-        likeWrap.classList.add("loading");
-        const was = likeWrap.classList.contains("liked");
-        let old = parseInt(likeDigit.textContent || "0", 10);
-        try {
-          likeWrap.classList.toggle("liked", !was);
-          likeDigit.textContent = was ? old - 1 : old + 1;
-          const { count, userLiked } = await adapter.toggleLike(cardId);
-          likeWrap.classList.toggle("liked", userLiked);
-          likeDigit.textContent = count;
-        } catch (err) {
-          likeWrap.classList.toggle("liked", was);
-          likeDigit.textContent = old;
-        } finally {
-          likeWrap.classList.remove("loading");
-        }
-      });
-    });
+      safeSetText(txt, count);
+    }
+    return true;
   }
 
   function setupCustomSort() {
@@ -406,39 +387,347 @@ const LIKE_BLOCK_SELECTOR =
     setupMutationObservers(debouncedListRefresh);
   });
 
+  class SupabaseAdapter {
+    constructor(supabase) {
+      this.supabase = supabase;
+      try {
+        this._likesCache =
+          JSON.parse(localStorage.getItem("likes_cache")) || {};
+      } catch {
+        this._likesCache = {};
+      }
+    }
+    getUserId() {
+      let uid = localStorage.getItem("user_id");
+      if (!uid) {
+        uid =
+          "user_" +
+          Math.random()
+            .toString(36)
+            .substr(2, 9);
+        localStorage.setItem("user_id", uid);
+      }
+      return uid;
+    }
+    async trackView(cardId) {
+      console.log("trackView cardId:", cardId);
+      const key = "viewedCards";
+      let seen = {};
+      try {
+        seen = JSON.parse(localStorage.getItem(key) || "{}");
+      } catch {
+        localStorage.setItem(key, "{}");
+      }
+      if (seen[cardId]) {
+        const { data } = await this.supabase
+          .from("page_views")
+          .select("views")
+          .eq("card_id", cardId)
+          .single();
+        return data?.views || 0;
+      }
+      seen[cardId] = true;
+      localStorage.setItem(key, JSON.stringify(seen));
+      const { data, error } = await this.supabase
+        .from("page_views")
+        .select("views")
+        .eq("card_id", cardId)
+        .single();
+      const newCnt = !error && data ? data.views + 1 : 1;
+      const upsertRes = await this.supabase
+        .from("page_views")
+        .upsert({ card_id: cardId, views: newCnt }, { onConflict: "card_id" });
+
+      if (upsertRes.error) {
+        console.error("Ошибка upsert page_views:", upsertRes.error);
+      } else {
+        console.log("Upsert page_views OK:", upsertRes);
+      }
+      return newCnt;
+    }
+    async loadLikes(cardId) {
+      const userId = this.getUserId();
+      const res = await this.supabase
+        .from("card_likes")
+        .select("user_id", { count: "exact" })
+        .eq("card_id", cardId);
+      const count = res.count || 0;
+      const userLiked = (res.data || []).some((r) => r.user_id === userId);
+      this._likesCache[cardId] = { count, userLiked };
+      try {
+        localStorage.setItem("likes_cache", JSON.stringify(this._likesCache));
+      } catch {}
+      return { count, userLiked };
+    }
+    async loadAllStats() {
+      const userId = this.getUserId();
+      const [likeRes, viewRes] = await Promise.all([
+        this.supabase.from("card_likes").select("card_id,user_id"),
+        this.supabase.from("page_views").select("card_id,views"),
+      ]);
+      const likesMap = {},
+        userLikedMap = {},
+        viewsMap = {};
+      (likeRes.data || []).forEach((r) => {
+        likesMap[r.card_id] = (likesMap[r.card_id] || 0) + 1;
+        if (r.user_id === userId) userLikedMap[r.card_id] = true;
+      });
+      (viewRes.data || []).forEach((r) => {
+        viewsMap[r.card_id] = r.views;
+      });
+      return { likesMap, userLikedMap, viewsMap };
+    }
+    async loadStatsForList(cardIds = []) {
+      if (!cardIds.length)
+        return { likesMap: {}, userLikedMap: {}, viewsMap: {} };
+      const userId = this.getUserId();
+      const [likeRes, viewRes] = await Promise.all([
+        this.supabase
+          .from("card_likes")
+          .select("card_id,user_id")
+          .in("card_id", cardIds),
+        this.supabase
+          .from("page_views")
+          .select("card_id,views")
+          .in("card_id", cardIds),
+      ]);
+      const likesMap = {},
+        userLikedMap = {},
+        viewsMap = {};
+      (likeRes.data || []).forEach((r) => {
+        likesMap[r.card_id] = (likesMap[r.card_id] || 0) + 1;
+        if (r.user_id === userId) userLikedMap[r.card_id] = true;
+      });
+      (viewRes.data || []).forEach((r) => {
+        viewsMap[r.card_id] = r.views;
+      });
+      return { likesMap, userLikedMap, viewsMap };
+    }
+    async toggleLike(cardId) {
+      const userId = this.getUserId();
+      const { data, error } = await this.supabase.rpc("toggle_card_like", {
+        p_card_id: cardId,
+        p_user_id: userId,
+      });
+      if (error) throw error;
+      this._likesCache[cardId] = {
+        count: data.likes_count,
+        userLiked: data.user_liked,
+      };
+      try {
+        localStorage.setItem("likes_cache", JSON.stringify(this._likesCache));
+      } catch {}
+      return { count: data.likes_count, userLiked: data.user_liked };
+    }
+  }
+
+  class LocalAdapter {
+    constructor() {
+      this._likesKey = "card_likes";
+      this._viewsKey = "page_views";
+      this._seenKey = "viewedCards";
+    }
+    getUserId() {
+      let uid = localStorage.getItem("user_id");
+      if (!uid) {
+        uid =
+          "user_" +
+          Math.random()
+            .toString(36)
+            .substr(2, 9);
+        localStorage.setItem("user_id", uid);
+      }
+      return uid;
+    }
+    async trackView(cardId) {
+      let seen = {};
+      try {
+        seen = JSON.parse(localStorage.getItem(this._seenKey) || "{}");
+      } catch {
+        localStorage.setItem(this._seenKey, "{}");
+      }
+      if (seen[cardId]) {
+        const now = JSON.parse(localStorage.getItem(this._viewsKey) || "{}");
+        return now[cardId] || 0;
+      }
+      seen[cardId] = true;
+      localStorage.setItem(this._seenKey, JSON.stringify(seen));
+      const views = JSON.parse(localStorage.getItem(this._viewsKey) || "{}");
+      views[cardId] = (views[cardId] || 0) + 1;
+      localStorage.setItem(this._viewsKey, JSON.stringify(views));
+      return views[cardId];
+    }
+    async loadLikes(cardId) {
+      const likes = JSON.parse(localStorage.getItem(this._likesKey) || "{}");
+      const uid = this.getUserId();
+      const arr = likes[cardId] || [];
+      return { count: arr.length, userLiked: arr.includes(uid) };
+    }
+    async loadAllStats() {
+      const likes = JSON.parse(localStorage.getItem(this._likesKey) || "{}");
+      const views = JSON.parse(localStorage.getItem(this._viewsKey) || "{}");
+      const uid = this.getUserId();
+      const likesMap = {},
+        userLikedMap = {},
+        viewsMap = {};
+      Object.entries(likes).forEach(([cid, arr]) => {
+        likesMap[cid] = arr.length;
+        if (arr.includes(uid)) userLikedMap[cid] = true;
+      });
+      Object.assign(viewsMap, views);
+      return { likesMap, userLikedMap, viewsMap };
+    }
+    async loadStatsForList(cardIds = []) {
+      const likesMap = {},
+        userLikedMap = {},
+        viewsMap = {};
+      const likes = JSON.parse(localStorage.getItem(this._likesKey) || "{}");
+      const views = JSON.parse(localStorage.getItem(this._viewsKey) || "{}");
+      const uid = this.getUserId();
+      cardIds.forEach((cid) => {
+        const arr = likes[cid] || [];
+        likesMap[cid] = arr.length;
+        if (arr.includes(uid)) userLikedMap[cid] = true;
+        viewsMap[cid] = views[cid] || 0;
+      });
+      return { likesMap, userLikedMap, viewsMap };
+    }
+    async toggleLike(cardId) {
+      const likes = JSON.parse(localStorage.getItem(this._likesKey) || "{}");
+      const uid = this.getUserId();
+      const arr = likes[cardId] || [];
+      const idx = arr.indexOf(uid);
+      if (idx >= 0) arr.splice(idx, 1);
+      else arr.push(uid);
+      likes[cardId] = arr;
+      localStorage.setItem(this._likesKey, JSON.stringify(likes));
+      return { count: arr.length, userLiked: arr.includes(uid) };
+    }
+  }
+
   window.sortItems = sortItems;
   window.setupCustomSort = setupCustomSort;
   window.refreshListing = refreshListing;
-  window.refreshDetail = refreshDetail;
-  window.initDetailLikeView = initDetailLikeView;
-  window.initLikeButtons = initLikeButtons;
-  window.SupabaseAdapter = SupabaseAdapter;
-  window.LocalAdapter = LocalAdapter;
 })();
+// test change
+document.addEventListener("DOMContentLoaded", () => {
+  const debouncedListRefresh = debounce(refreshListing, 300);
+  window.SupabaseAPI.onReady(async () => {
+    const isDetail = await refreshDetail();
+    if (!isDetail) refreshListing();
+    setupCustomSort();
+    setupPeriodicUpdates(debouncedListRefresh);
+    setupEventListeners(debouncedListRefresh);
+    setupMutationObservers(debouncedListRefresh);
+  });
+});
 
-// --- Универсальный SPA-роутер и инициализация ---
-async function handleRouteChange() {
-  const isDetail = await refreshDetail();
+// --- Инициализация лайков и просмотров на детальной странице (универсально для десктопа и мобилки) ---
+function initDetailLikeView() {
+  const likeWraps = [
+    ...document.querySelectorAll(
+      ".idea-content_card-tags-likes-wrapper, .idea-content_card-tags-likes-wrapper-mobile"
+    ),
+  ];
+  const viewCount = document.querySelector(".view-count");
+  if (!likeWraps.length || !viewCount) return;
+
+  const m = location.pathname.toLowerCase().match(/^\/library\/([^\/]+?)\/?$/);
+  if (!m) return;
+  const cardId = m[1];
+
+  // Получаем адаптер (используем уже существующий)
+  let adapter = window.adapter;
+  if (!adapter) {
+    if (window.supabaseInstance) {
+      adapter = new SupabaseAdapter(window.supabaseInstance);
+    } else {
+      adapter = new LocalAdapter();
+    }
+    window.adapter = adapter;
+  }
+
+  // Получаем и отображаем просмотры
+  adapter.trackView(cardId).then((vc) => {
+    viewCount.textContent = vc;
+  });
+
+  // Получаем и отображаем лайки для каждого блока
+  adapter.loadLikes(cardId).then(({ count, userLiked }) => {
+    likeWraps.forEach((likeWrap) => {
+      const likeDigit = likeWrap.querySelector(
+        ".idea-content_card-tags-likes-text-digit"
+      );
+      if (likeDigit) likeDigit.textContent = count;
+      likeWrap.classList.toggle("liked", userLiked);
+    });
+  });
+
+  // Навешиваем обработчик лайка (если не навешен)
+  likeWraps.forEach((likeWrap) => {
+    if (!likeWrap.dataset.detailLikeInit) {
+      likeWrap.dataset.detailLikeInit = "1";
+      likeWrap.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (likeWrap.classList.contains("loading")) return;
+        likeWrap.classList.add("loading");
+        const likeDigit = likeWrap.querySelector(
+          ".idea-content_card-tags-likes-text-digit"
+        );
+        const was = likeWrap.classList.contains("liked");
+        let old = parseInt(likeDigit?.textContent || "0", 10);
+        try {
+          likeWrap.classList.toggle("liked", !was);
+          if (likeDigit) likeDigit.textContent = was ? old - 1 : old + 1;
+          const { count, userLiked } = await adapter.toggleLike(cardId);
+          likeWrap.classList.toggle("liked", userLiked);
+          if (likeDigit) likeDigit.textContent = count;
+        } catch (err) {
+          likeWrap.classList.toggle("liked", was);
+          if (likeDigit) likeDigit.textContent = old;
+        } finally {
+          likeWrap.classList.remove("loading");
+        }
+      });
+    }
+  });
+}
+
+// --- Универсальный SPA-роутер для Webflow ---
+function runSpaRouter() {
+  const isDetail = /^\/library\/[^\/]+\/?$/.test(
+    location.pathname.toLowerCase()
+  );
   if (isDetail) {
-    initDetailLikeView();
+    if (typeof window.refreshDetail === "function") {
+      window.refreshDetail();
+    }
+    if (typeof window.initDetailLikeView === "function") {
+      window.initDetailLikeView();
+    }
   } else {
-    refreshListing();
+    if (typeof window.refreshListing === "function") {
+      window.refreshListing();
+    }
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  handleRouteChange();
-});
-
+// --- Патчим History API и слушаем popstate ---
 (function() {
-  const evt = new Event("locationchange");
-  const _push = history.pushState;
+  const origPush = history.pushState;
+  const origReplace = history.replaceState;
   history.pushState = function() {
-    const ret = _push.apply(this, arguments);
-    window.dispatchEvent(evt);
-    return ret;
+    origPush.apply(this, arguments);
+    setTimeout(runSpaRouter, 0);
   };
-  window.addEventListener("popstate", () => window.dispatchEvent(evt));
+  history.replaceState = function() {
+    origReplace.apply(this, arguments);
+    setTimeout(runSpaRouter, 0);
+  };
+  window.addEventListener("popstate", () => setTimeout(runSpaRouter, 0));
 })();
 
-window.addEventListener("locationchange", handleRouteChange);
+// --- Экспортируем функции в window ---
+window.refreshDetail = refreshDetail;
+window.initDetailLikeView = initDetailLikeView;
