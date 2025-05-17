@@ -605,6 +605,10 @@
     }
   }
 
+  // --- Экспортируем классы в window ---
+  window.SupabaseAdapter = SupabaseAdapter;
+  window.LocalAdapter = LocalAdapter;
+
   window.sortItems = sortItems;
   window.setupCustomSort = setupCustomSort;
   window.refreshListing = refreshListing;
@@ -630,11 +634,26 @@ function initDetailLikeView() {
     ),
   ];
   const viewCount = document.querySelector(".view-count");
-  if (!likeWraps.length || !viewCount) return;
+  if (!likeWraps.length || !viewCount) {
+    console.warn(
+      "[Like] Не найдено ни одного лайк-блока на детальной странице"
+    );
+    return;
+  }
 
   const m = location.pathname.toLowerCase().match(/^\/library\/([^\/]+?)\/?$/);
   if (!m) return;
   const cardId = m[1];
+
+  // Явно проставляем data-card-id для всех лайк-блоков
+  likeWraps.forEach((likeWrap) => {
+    likeWrap.dataset.cardId = cardId;
+    if (
+      likeWrap.classList.contains("idea-content_card-tags-likes-wrapper-mobile")
+    ) {
+      console.log("[Like] Найден мобильный лайк-блок", likeWrap);
+    }
+  });
 
   // Получаем адаптер (используем уже существующий)
   let adapter = window.adapter;
@@ -690,6 +709,16 @@ function initDetailLikeView() {
           likeWrap.classList.remove("loading");
         }
       });
+      if (
+        likeWrap.classList.contains(
+          "idea-content_card-tags-likes-wrapper-mobile"
+        )
+      ) {
+        console.log(
+          "[Like] Навешан обработчик на мобильный лайк-блок",
+          likeWrap
+        );
+      }
     }
   });
 }
